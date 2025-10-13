@@ -55,6 +55,16 @@
             border-top-color: #fff;
             animation: spin 1s linear infinite;
         }
+        .auth-ui-element {
+            display: none;
+        }
+        .auth-ui-element.visible {
+            display: flex;
+        }
+        .main-content.logged-out {
+            opacity: 0.5;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="bg-slate-100 antialiased text-slate-800 dark:bg-slate-900 dark:text-slate-300">
@@ -62,16 +72,33 @@
     <div id="app-container" class="min-h-screen flex flex-col items-center p-4 sm:p-6 lg:p-8">
         <div class="w-full max-w-6xl mx-auto">
             
-            <header class="text-center mb-8 relative">
-                <h1 class="text-4xl font-bold text-slate-900 dark:text-slate-100">Meu Organizador Diário ✨</h1>
-                <p class="text-slate-600 dark:text-slate-400 mt-2">Planeje seu dia com o poder da IA. (Conectado à Nuvem)</p>
-                <button id="theme-toggle" class="absolute right-0 top-1/2 -translate-y-1/2 p-2 rounded-full text-slate-500 dark:text-yellow-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-300">
+            <header class="text-center mb-8 relative flex justify-between items-center">
+                <div id="auth-container" class="text-left">
+                     <button id="login-btn" class="auth-ui-element items-center bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-50 dark:hover:bg-slate-600 transition">
+                        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6.36211C16.157 6.03215 17.4337 6.3353 18.2526 7.15424C19.0716 7.97318 19.3747 9.24987 19.0448 10.4068M6.36211 15C6.03215 16.157 6.3353 17.4337 7.15424 18.2526C7.97318 19.0716 9.24987 19.3747 10.4068 19.0448"/><path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C12.3563 3 12.7073 3.01518 13.0519 3.04419"/><path d="M12 8V12L15 14"/></svg>
+                        Entrar com Google
+                    </button>
+                    <div id="user-info" class="auth-ui-element items-center space-x-3">
+                        <img id="user-avatar" class="w-10 h-10 rounded-full" src="" alt="User Avatar">
+                        <div class="text-left">
+                            <p id="user-name" class="font-semibold text-slate-800 dark:text-slate-200"></p>
+                            <button id="logout-btn" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">Sair</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="absolute left-1/2 -translate-x-1/2">
+                    <h1 class="text-4xl font-bold text-slate-900 dark:text-slate-100">Meu Organizador Diário ✨</h1>
+                    <p class="text-slate-600 dark:text-slate-400 mt-2">Planeje seu dia com o poder da IA.</p>
+                </div>
+
+                <button id="theme-toggle" class="p-2 rounded-full text-slate-500 dark:text-yellow-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-300">
                     <i data-lucide="moon" class="w-6 h-6 block dark:hidden"></i>
                     <i data-lucide="sun" class="w-6 h-6 hidden dark:block"></i>
                 </button>
             </header>
 
-            <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <main id="main-content" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                 <!-- Coluna da Esquerda: Adicionar Tarefa -->
                 <aside class="lg:col-span-1">
@@ -150,13 +177,18 @@
                         </div>
                         
                         <ul id="task-list" class="space-y-4">
+                             <div id="logged-out-state" class="text-center py-12">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/><path d="M21 12c-1.65-3.33-5.02-6-9-6s-7.35 2.67-9 6c1.65 3.33 5.02 6 9 6s7.35-2.67 9 6Z"/><path d="M2 12h20"/></svg>
+                                <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Bem-vindo(a)!</h3>
+                                <p class="mt-1 text-slate-500 dark:text-slate-400">Faça login com sua conta Google para ver e gerenciar suas tarefas.</p>
+                            </div>
                              <div id="empty-state" class="text-center py-12 hidden">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Z"/><path d="M15 2v20"/><path d="M8 7h4"/><path d="M8 12h4"/><path d="M8 17h4"/></svg>
                                 <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Nenhuma tarefa por aqui!</h3>
                                 <p class="mt-1 text-slate-500 dark:text-slate-400">Adicione uma nova tarefa para começar a se organizar.</p>
                             </div>
-                            <div id="loading-state" class="text-center py-12">
-                                <p class="text-slate-500 dark:text-slate-400">Conectando ao banco de dados...</p>
+                            <div id="loading-state" class="text-center py-12 hidden">
+                                <p class="text-slate-500 dark:text-slate-400">Carregando tarefas...</p>
                             </div>
                         </ul>
                     </div>
@@ -165,7 +197,7 @@
         </div>
     </div>
     
-    <!-- Modal para Chave de API Gemini -->
+    <!-- Modais -->
     <div id="api-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl transform transition-all scale-95 opacity-0">
             <div class="flex justify-between items-center mb-4">
@@ -188,13 +220,11 @@
             </form>
         </div>
     </div>
-    
-    <!-- Outros Modais (Notificação, Edição) -->
     <div id="notification-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-sm w-full mx-auto text-center shadow-2xl transform transition-all scale-95 opacity-0">
             <div id="modal-icon" class="mx-auto mb-4"></div>
             <h3 id="modal-title" class="text-lg font-semibold text-slate-900 dark:text-slate-100"></h3>
-            <p id="modal-message" class="text-sm text-slate-600 dark:text-slate-400 mt-2"></p>
+            <p id="modal-message" class="text-sm text-slate-600 dark:text-slate-400 mt-2 break-words"></p>
             <button id="modal-close-btn" class="mt-6 bg-indigo-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
                 Ok
             </button>
@@ -267,7 +297,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy, writeBatch, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         // --- Firebase Config ---
         const firebaseConfig = {
@@ -287,25 +317,9 @@
         const auth = getAuth(app);
 
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Theme Toggle ---
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            themeToggleBtn.addEventListener('click', () => {
-                if (document.documentElement.classList.contains('dark')) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.theme = 'light';
-                } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.theme = 'dark';
-                }
-            });
-
             lucide.createIcons();
             // --- DOM Elements ---
+            const mainContent = document.getElementById('main-content');
             const taskForm = document.getElementById('task-form');
             const taskInput = document.getElementById('task-input');
             const taskDatetime = document.getElementById('task-datetime');
@@ -313,21 +327,31 @@
             const taskReminder = document.getElementById('task-reminder');
             const taskList = document.getElementById('task-list');
             const filterCategory = document.getElementById('filter-category');
+            
+            // State Displays
+            const loggedOutState = document.getElementById('logged-out-state');
             const emptyState = document.getElementById('empty-state');
             const loadingState = document.getElementById('loading-state');
             
-            // Modals
-            const notificationModal = document.getElementById('notification-modal'), modalContent = notificationModal.querySelector('div'), modalIcon = document.getElementById('modal-icon'), modalTitle = document.getElementById('modal-title'), modalMessage = document.getElementById('modal-message'), modalCloseBtn = document.getElementById('modal-close-btn');
+            // Auth UI
+            const loginBtn = document.getElementById('login-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            const userInfo = document.getElementById('user-info');
+            const userAvatar = document.getElementById('user-avatar');
+            const userName = document.getElementById('user-name');
+
+            // Modals and other elements...
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const notificationModal = document.getElementById('notification-modal'), modalIcon = document.getElementById('modal-icon'), modalTitle = document.getElementById('modal-title'), modalMessage = document.getElementById('modal-message'), modalCloseBtn = document.getElementById('modal-close-btn');
             const editModal = document.getElementById('edit-modal'), editTaskForm = document.getElementById('edit-task-form'), editTaskId = document.getElementById('edit-task-id'), editTaskInput = document.getElementById('edit-task-input'), editTaskDatetime = document.getElementById('edit-task-datetime'), editTaskCategory = document.getElementById('edit-task-category'), editTaskReminder = document.getElementById('edit-task-reminder'), editModalCloseBtn = document.getElementById('edit-modal-close-btn');
             const editSubtaskModal = document.getElementById('edit-subtask-modal'), editSubtaskForm = document.getElementById('edit-subtask-form'), editSubtaskId = document.getElementById('edit-subtask-id'), editSubtaskParentId = document.getElementById('edit-subtask-parent-id'), editSubtaskInput = document.getElementById('edit-subtask-input'), editSubtaskStartDate = document.getElementById('edit-subtask-startdate'), editSubtaskModalCloseBtn = document.getElementById('edit-subtask-modal-close-btn');
             const apiKeyModal = document.getElementById('api-key-modal'), apiKeyForm = document.getElementById('api-key-form'), apiKeyInput = document.getElementById('api-key-input'), apiKeyBtn = document.getElementById('api-key-btn'), apiKeyModalCloseBtn = document.getElementById('api-key-modal-close-btn');
-            
-            // Gemini Elements
             const geminiDecomposeBtn = document.getElementById('gemini-decompose-btn');
 
             // --- App State ---
             let currentUserId = null;
             let tasks = [];
+            let mainTaskListener = () => {};
             let subtaskListeners = {};
             let notifiedTasks = new Set();
             let audioCtx;
@@ -341,32 +365,92 @@
             };
 
             // --- Authentication ---
+            const signInWithGoogle = async () => {
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Erro no login com Google:", error);
+                    if (error.code === 'auth/unauthorized-domain') {
+                        const currentOrigin = window.location.origin;
+                        const detailedMessage = `O domínio "${currentOrigin}" não está autorizado. Vá ao seu Console do Firebase > Authentication > Settings > Domínios autorizados e adicione ESTE domínio e também "usercontent.goog" à lista.`;
+                        showModal(
+                            'error', 
+                            'Domínio Não Autorizado', 
+                            detailedMessage
+                        );
+                    } else {
+                        showModal('error', 'Falha no Login', `Não foi possível autenticar. Erro: ${error.message}`);
+                    }
+                }
+            };
+
+            const logoutUser = async () => {
+                try {
+                    await signOut(auth);
+                } catch (error) {
+                    console.error("Erro ao sair:", error);
+                }
+            };
+            
             onAuthStateChanged(auth, (user) => {
-                loadingState.classList.add('hidden');
-                if (user) {
+                if (user) { // User is signed in
                     currentUserId = user.uid;
+                    userName.textContent = user.displayName;
+                    userAvatar.src = user.photoURL;
+                    
+                    loginBtn.classList.remove('visible');
+                    userInfo.classList.add('visible');
+                    mainContent.classList.remove('logged-out');
+
                     loadTasks(currentUserId);
-                } else {
-                    signInAnonymously(auth).catch(error => {
-                        console.error("Anonymous sign-in failed:", error)
-                        if (error.code === 'auth/operation-not-allowed') {
-                             showModal('error', 'Autenticação Anônima Desativada', 'Por favor, ative o método de login anônimo no seu console do Firebase.');
-                        }
-                    });
+                } else { // User is signed out
+                    currentUserId = null;
+                    mainTaskListener(); // Unsubscribe from previous user's tasks
+                    Object.values(subtaskListeners).forEach(unsub => unsub());
+                    subtaskListeners = {};
+                    tasks = [];
+                    
+                    loginBtn.classList.add('visible');
+                    userInfo.classList.remove('visible');
+                    mainContent.classList.add('logged-out');
+
+                    taskList.innerHTML = '';
+                    loggedOutState.classList.remove('hidden');
+                    emptyState.classList.add('hidden');
+                    loadingState.classList.add('hidden');
                 }
             });
             
-             function loadTasks(userId) {
+            function loadTasks(userId) {
+                loadingState.classList.remove('hidden');
+                loggedOutState.classList.add('hidden');
+
                 const q = query(collection(db, 'users', userId, 'tasks'), orderBy('datetime'));
-                onSnapshot(q, snapshot => {
+                mainTaskListener = onSnapshot(q, snapshot => {
+                    loadingState.classList.add('hidden');
                     tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     renderTasks();
                 }, error => {
                     console.error("Error loading tasks: ", error);
+                    loadingState.classList.add('hidden');
                     showModal('error', 'Erro de Conexão', 'Não foi possível carregar as tarefas. Verifique as regras de segurança do seu Firestore.');
                 });
             }
-
+            
+            // --- Theme Management ---
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            themeToggleBtn.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            });
+            
+            // --- All other functions (showModal, createTaskElement, etc.) remain largely the same ---
+            
             function showGenericModal(modalElement) {
                 modalElement.classList.remove('hidden');
                 setTimeout(() => {
@@ -374,7 +458,6 @@
                     if (content) content.classList.add('scale-100', 'opacity-100');
                 }, 10);
             }
-
             function hideGenericModal(modalElement) {
                  const content = modalElement.querySelector('div');
                  if (content) content.classList.remove('scale-100', 'opacity-100');
@@ -387,7 +470,6 @@
                 modalMessage.textContent = message;
                 showGenericModal(notificationModal);
             }
-
             function showEditModal(task) {
                 editTaskId.value = task.id;
                 editTaskInput.value = task.text;
@@ -420,7 +502,6 @@
                     loader.classList.add('hidden');
                 }
             }
-
             async function callGeminiAPI(taskText) {
                 if (!geminiApiKey) {
                     showModal('error', 'Chave de API Faltando', 'Por favor, configure sua chave de API do Gemini para usar esta funcionalidade.');
@@ -440,20 +521,16 @@
                         }
                     }
                 };
-
                 try {
                     const response = await fetch(API_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-
                     if (!response.ok) {
                         const errorBody = await response.json();
-                        console.error('API Error:', errorBody);
                         throw new Error(`Erro da API: ${errorBody.error?.message || response.statusText}`);
                     }
-
                     const result = await response.json();
                     const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!jsonText) throw new Error("Resposta da API inválida.");
@@ -466,7 +543,6 @@
                     return null;
                 }
             }
-            
             const handleGeminiDecompose = async () => {
                 const text = taskInput.value.trim();
                 const datetime = taskDatetime.value;
@@ -474,7 +550,6 @@
                     showModal('error', 'Campos Incompletos', 'Preencha a descrição e a data/hora da tarefa antes de usar a IA.');
                     return;
                 }
-                
                 toggleGeminiLoading(true);
                 const subtasks = await callGeminiAPI(text);
                 toggleGeminiLoading(false);
@@ -515,7 +590,6 @@
                     geminiDecomposeBtn.disabled = true;
                 }
             };
-            
             const saveApiKey = (e) => {
                 e.preventDefault();
                 const key = apiKeyInput.value.trim();
@@ -529,8 +603,9 @@
             };
             const renderTasks = () => {
                 taskList.innerHTML = '';
+                loggedOutState.classList.add('hidden');
+
                 const filter = filterCategory.value;
-                
                 const filteredTasks = tasks.filter(task => {
                     if (filter === 'all') return true;
                     if (filter === 'concluidas') return task.completed;
@@ -549,7 +624,6 @@
                 }
                 lucide.createIcons();
             };
-
             const createTaskElement = (task) => {
                 const li = document.createElement('li');
                 li.className = `task-item bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 transition-colors duration-300 border-l-4 ${task.completed ? 'border-slate-300 dark:border-slate-600' : 'border-indigo-500 dark:border-indigo-400'}`;
@@ -601,49 +675,30 @@
                          <ul class="subtask-list space-y-2 mt-2"></ul>
                     </div>
                 `;
-
                 const subtaskContainer = li.querySelector('.subtask-list');
                 const counterElement = li.querySelector('.subtask-counter');
                 loadAndRenderSubtasks(task.id, subtaskContainer, counterElement);
-                
                 return li;
             };
-
             function loadAndRenderSubtasks(taskId, container, counterElement) {
                 const subtaskCollectionRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
                 const q = query(subtaskCollectionRef, orderBy('createdAt'));
-
-                if(subtaskListeners[taskId]) {
-                    subtaskListeners[taskId](); // Unsubscribe from previous listener
-                }
-
+                if(subtaskListeners[taskId]) subtaskListeners[taskId](); 
                 subtaskListeners[taskId] = onSnapshot(q, (snapshot) => {
                     container.innerHTML = '';
                     const subtasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
                     const completedCount = subtasks.filter(st => st.completed).length;
                     if(counterElement) counterElement.textContent = `${completedCount}/${subtasks.length} concluídas`;
-                    
                     const expandBtn = container.closest('.task-item').querySelector('.expand-subtasks-btn');
-                    if (subtasks.length > 0) {
-                        expandBtn.classList.remove('hidden');
-                    } else {
-                        expandBtn.classList.add('hidden');
-                    }
-
-                    subtasks.forEach(subtask => {
-                        const subtaskElement = createSubtaskElement(subtask);
-                        container.appendChild(subtaskElement);
-                    });
+                    if (subtasks.length > 0) expandBtn.classList.remove('hidden'); else expandBtn.classList.add('hidden');
+                    subtasks.forEach(subtask => container.appendChild(createSubtaskElement(subtask)));
                     lucide.createIcons();
                 });
             }
-
             const createSubtaskElement = (subtask) => {
                 const li = document.createElement('li');
                 li.className = 'subtask-item flex items-center justify-between bg-white dark:bg-slate-700 p-2.5 rounded-lg border border-slate-200 dark:border-slate-600';
                 li.dataset.id = subtask.id;
-
                 const startDate = new Date(subtask.startDate + 'T00:00:00');
                 const formattedStartDate = startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                 let completionDateText = '';
@@ -651,7 +706,6 @@
                      const completionDate = new Date(subtask.completionDate);
                      completionDateText = ` - Concluída em ${completionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`;
                 }
-
                 li.innerHTML = `
                     <div class="flex items-center">
                         <input type="checkbox" class="subtask-checkbox h-4 w-4 rounded border-gray-300 dark:border-slate-500 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-600" ${subtask.completed ? 'checked' : ''}>
@@ -667,9 +721,12 @@
                 `;
                 return li;
             };
-
             const addTask = async (e) => {
                 e.preventDefault();
+                if (!currentUserId) {
+                    showModal('error', 'Login Necessário', 'Você precisa estar logado para adicionar uma tarefa.');
+                    return;
+                }
                 const text = taskInput.value.trim();
                 const datetime = taskDatetime.value;
                 if (!text || !datetime) return;
@@ -679,101 +736,64 @@
                     taskForm.reset();
                 } catch (error) { console.error("Error adding document: ", error); }
             };
-
             const handleUpdateTask = async (e) => {
                 e.preventDefault();
                 const id = editTaskId.value;
-                const updatedData = {
-                    text: editTaskInput.value,
-                    datetime: editTaskDatetime.value,
-                    category: editTaskCategory.value,
-                    reminder: editTaskReminder.checked
-                };
+                const updatedData = { text: editTaskInput.value, datetime: editTaskDatetime.value, category: editTaskCategory.value, reminder: editTaskReminder.checked };
                 try {
                     await updateDoc(doc(db, 'users', currentUserId, 'tasks', id), updatedData);
                     hideEditModal();
                 } catch (error) { console.error("Error updating document: ", error); }
             };
-
-             const handleUpdateSubtask = async (e) => {
+            const handleUpdateSubtask = async (e) => {
                 e.preventDefault();
                 const id = editSubtaskId.value;
                 const parentId = editSubtaskParentId.value;
-                const updatedData = {
-                    text: editSubtaskInput.value,
-                    startDate: editSubtaskStartDate.value
-                };
+                const updatedData = { text: editSubtaskInput.value, startDate: editSubtaskStartDate.value };
                 try {
                     await updateDoc(doc(db, 'users', currentUserId, 'tasks', parentId, 'subtasks', id), updatedData);
                     hideEditSubtaskModal();
                 } catch (error) { console.error("Error updating subtask: ", error); }
             };
-
             const handleTaskListClick = async (e) => {
+                if (!currentUserId) return;
                 const target = e.target;
                 const taskItem = target.closest('.task-item');
                 if (!taskItem) return;
-
                 const taskId = taskItem.dataset.id;
                 const task = tasks.find(t => t.id === taskId);
                 
-                // Toggle task completion
                 if (target.classList.contains('task-checkbox')) {
                     await updateDoc(doc(db, 'users', currentUserId, 'tasks', taskId), { completed: target.checked });
-                }
-                // Delete task
-                if (target.closest('.delete-task-btn')) {
-                    // Also delete subcollection
+                } else if (target.closest('.delete-task-btn')) {
                      const subtasksRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
                      const subtasksSnapshot = await getDocs(subtasksRef);
                      const batch = writeBatch(db);
                      subtasksSnapshot.forEach((doc) => batch.delete(doc.ref));
                      await batch.commit();
-                     // Delete main task
                     await deleteDoc(doc(db, 'users', currentUserId, 'tasks', taskId));
-                }
-                // Edit task
-                if (target.closest('.edit-task-btn')) {
+                } else if (target.closest('.edit-task-btn')) {
                     showEditModal(task);
-                }
-                // Show add subtask form
-                if (target.closest('.add-subtask-btn')) {
+                } else if (target.closest('.add-subtask-btn')) {
                     const form = taskItem.querySelector('.add-subtask-form');
                     form.classList.toggle('hidden');
                     form.querySelector('input[type="text"]').focus();
-                }
-                // Cancel adding subtask
-                if (target.closest('.cancel-subtask-btn')) {
+                } else if (target.closest('.cancel-subtask-btn')) {
                     target.closest('form').classList.add('hidden');
-                }
-                // Expand/collapse subtasks
-                if (target.closest('.expand-subtasks-btn')) {
+                } else if (target.closest('.expand-subtasks-btn')) {
                     const expandBtn = target.closest('.expand-subtasks-btn');
                     const subtaskList = taskItem.querySelector('.subtask-list');
                     subtaskList.classList.toggle('expanded');
-                    
-                    const currentSvg = expandBtn.querySelector('svg');
-                    if (currentSvg) {
-                        currentSvg.remove();
-                    }
-
-                    const newIcon = document.createElement('i');
                     const iconName = subtaskList.classList.contains('expanded') ? 'chevron-up' : 'chevron-down';
-                    newIcon.setAttribute('data-lucide', iconName);
-                    newIcon.className = 'w-5 h-5';
-                    expandBtn.appendChild(newIcon);
-                    
+                    expandBtn.innerHTML = `<i data-lucide="${iconName}" class="w-5 h-5"></i>`;
                     lucide.createIcons();
-                }
-                // Handle add subtask form submission
-                if (target.closest('.add-subtask-form')) {
+                } else if (target.closest('.add-subtask-form')) {
                     e.preventDefault();
                     const form = target.closest('.add-subtask-form');
                     const textInput = form.querySelector('input[type="text"]');
                     const dateInput = form.querySelector('input[type="date"]');
                     const text = textInput.value.trim();
                     const startDate = dateInput.value;
-
                     if (text && startDate) {
                         const newSubtask = { text, startDate, completed: false, completionDate: null, createdAt: new Date() };
                         await addDoc(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'), newSubtask);
@@ -781,24 +801,17 @@
                         form.classList.add('hidden');
                     }
                 }
-                // Subtask interactions
                 const subtaskItem = target.closest('.subtask-item');
                 if (subtaskItem) {
                     const subtaskId = subtaskItem.dataset.id;
                     const subtaskRef = doc(db, 'users', currentUserId, 'tasks', taskId, 'subtasks', subtaskId);
-                    
                     if (target.classList.contains('subtask-checkbox')) {
                         const isCompleted = target.checked;
-                        const updateData = {
-                            completed: isCompleted,
-                            completionDate: isCompleted ? new Date().toISOString().split('T')[0] : null
-                        };
+                        const updateData = { completed: isCompleted, completionDate: isCompleted ? new Date().toISOString().split('T')[0] : null };
                         await updateDoc(subtaskRef, updateData);
-                    }
-                    if(target.closest('.delete-subtask-btn')) {
+                    } else if(target.closest('.delete-subtask-btn')) {
                         await deleteDoc(subtaskRef);
-                    }
-                    if(target.closest('.edit-subtask-btn')) {
+                    } else if(target.closest('.edit-subtask-btn')) {
                         const subtaskDoc = await getDoc(subtaskRef);
                         if (subtaskDoc.exists()) {
                             showEditSubtaskModal({id: subtaskDoc.id, ...subtaskDoc.data()}, taskId);
@@ -806,28 +819,14 @@
                     }
                 }
             };
-            
             function playNotificationSound() {
                 if (!audioCtx) return;
                 const gainNode = audioCtx.createGain();
                 gainNode.connect(audioCtx.destination);
                 gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-
-                const osc1 = audioCtx.createOscillator();
-                osc1.connect(gainNode);
-                osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(440, audioCtx.currentTime);
-                osc1.start(audioCtx.currentTime);
-                osc1.stop(audioCtx.currentTime + 0.1);
-
-                const osc2 = audioCtx.createOscillator();
-                osc2.connect(gainNode);
-                osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15);
-                osc2.start(audioCtx.currentTime + 0.15);
-                osc2.stop(audioCtx.currentTime + 0.3);
+                const osc1 = audioCtx.createOscillator(); osc1.connect(gainNode); osc1.type = 'sine'; osc1.frequency.setValueAtTime(440, audioCtx.currentTime); osc1.start(audioCtx.currentTime); osc1.stop(audioCtx.currentTime + 0.1);
+                const osc2 = audioCtx.createOscillator(); osc2.connect(gainNode); osc2.type = 'sine'; osc2.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); osc2.start(audioCtx.currentTime + 0.15); osc2.stop(audioCtx.currentTime + 0.3);
             }
-
             const notifyUser = (task) => {
                 if (Notification.permission === 'granted') {
                     const notification = new Notification('Lembrete de Tarefa!', {
@@ -837,8 +836,8 @@
                     playNotificationSound();
                 }
             };
-
             const checkReminders = () => {
+                if (!currentUserId) return;
                 const now = new Date();
                 tasks.forEach(task => {
                     if (task.reminder && !task.completed && !notifiedTasks.has(task.id)) {
@@ -852,40 +851,34 @@
                 });
             };
 
+            // Event Listeners
+            loginBtn.addEventListener('click', signInWithGoogle);
+            logoutBtn.addEventListener('click', logoutUser);
             taskForm.addEventListener('submit', addTask);
             taskList.addEventListener('click', handleTaskListClick);
             filterCategory.addEventListener('change', renderTasks);
             modalCloseBtn.addEventListener('click', () => hideGenericModal(notificationModal));
-            notificationModal.addEventListener('click', (e) => { if (e.target === notificationModal) hideGenericModal(notificationModal); });
             editTaskForm.addEventListener('submit', handleUpdateTask);
             editModalCloseBtn.addEventListener('click', hideEditModal);
             editSubtaskForm.addEventListener('submit', handleUpdateSubtask);
             editSubtaskModalCloseBtn.addEventListener('click', hideEditSubtaskModal);
-            
             apiKeyBtn.addEventListener('click', () => showGenericModal(apiKeyModal));
             apiKeyModalCloseBtn.addEventListener('click', () => hideGenericModal(apiKeyModal));
             apiKeyForm.addEventListener('submit', saveApiKey);
             geminiDecomposeBtn.addEventListener('click', handleGeminiDecompose);
-            taskInput.addEventListener('input', () => {
-                if (geminiApiKey) {
-                    geminiDecomposeBtn.disabled = !taskInput.value.trim();
-                }
-            });
+            taskInput.addEventListener('input', () => { if (geminiApiKey) { geminiDecomposeBtn.disabled = !taskInput.value.trim(); } });
             
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             taskDatetime.min = now.toISOString().slice(0,16);
             updateApiKeyStatus();
-
             const initAudioContext = () => { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); };
             document.body.addEventListener('click', initAudioContext, { once: true });
             
             if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
                 setTimeout(() => {
                      showModal('info', 'Ativar Notificações?', 'Permita o envio de notificações para receber lembretes de suas tarefas na área de trabalho.');
-                     setTimeout(() => { // Give user time to read before browser prompt
-                          Notification.requestPermission();
-                     }, 3000);
+                     setTimeout(() => Notification.requestPermission(), 3000);
                 }, 5000);
             }
             setInterval(checkReminders, 30000); 
