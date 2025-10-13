@@ -75,7 +75,7 @@
             <header class="text-center mb-8 relative flex justify-between items-center">
                 <div id="auth-container" class="text-left">
                      <button id="login-btn" class="auth-ui-element items-center bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-50 dark:hover:bg-slate-600 transition">
-                        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6.36211C16.157 6.03215 17.4337 6.3353 18.2526 7.15424C19.0716 7.97318 19.3747 9.24987 19.0448 10.4068M6.36211 15C6.03215 16.157 6.3353 17.4337 7.15424 18.2526C7.97318 19.0716 9.24987 19.3747 10.4068 19.0448"/><path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C12.3563 3 12.7073 3.01518 13.0519 3.04419"/><path d="M12 8V12L15 14"/></svg>
+                        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6.36211C16.157 6.03215 17.4337 6.3353 18.2526 7.15424C19.0716 7.97318 19.3747 9.24987 19.0448 10.4068M6.36211 15C6.03215 16.157 6.3353 17.4337 7.15424 18.2526C7.97318 19.0716 9.24987 19.3747 10.4068 19.0448"/><path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C12.3563 3 12.7073 3.01518 13.0519 3.04419"/><path d="M12 8V12L15 14"/></svg>
                         Entrar com Google
                     </button>
                     <div id="user-info" class="auth-ui-element items-center space-x-3">
@@ -819,14 +819,31 @@
                     }
                 }
             };
+            
             function playNotificationSound() {
                 if (!audioCtx) return;
+                // Cria um som mais melódico e agradável
                 const gainNode = audioCtx.createGain();
                 gainNode.connect(audioCtx.destination);
-                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-                const osc1 = audioCtx.createOscillator(); osc1.connect(gainNode); osc1.type = 'sine'; osc1.frequency.setValueAtTime(440, audioCtx.currentTime); osc1.start(audioCtx.currentTime); osc1.stop(audioCtx.currentTime + 0.1);
-                const osc2 = audioCtx.createOscillator(); osc2.connect(gainNode); osc2.type = 'sine'; osc2.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); osc2.start(audioCtx.currentTime + 0.15); osc2.stop(audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // Volume um pouco mais baixo
+
+                const oscillator = audioCtx.createOscillator();
+                oscillator.connect(gainNode);
+                oscillator.type = 'triangle'; // Um timbre mais suave que 'sine'
+
+                // Sequência de 3 notas rápidas (um arpejo)
+                const now = audioCtx.currentTime;
+                oscillator.frequency.setValueAtTime(523.25, now); // C5
+                oscillator.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                oscillator.frequency.setValueAtTime(783.99, now + 0.2); // G5
+
+                // Efeito de "fade out" para suavizar o final
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.5);
+
+                oscillator.start(now);
+                oscillator.stop(now + 0.5);
             }
+
             const notifyUser = (task) => {
                 if (Notification.permission === 'granted') {
                     const notification = new Notification('Lembrete de Tarefa!', {
