@@ -351,8 +351,8 @@
             // --- App State ---
             let currentUserId = null;
             let tasks = [];
-            let mainTaskListener = () => {};
-            let subtaskListeners = {};
+            let unsubscribeMain = () => {};
+            let unsubscribeSubtasks = {};
             let notifiedTasks = new Set();
             let audioCtx;
             let geminiApiKey = sessionStorage.getItem('geminiApiKey') || null;
@@ -393,50 +393,54 @@
                 }
             };
             
+            const cleanupListeners = () => {
+                unsubscribeMain();
+                Object.values(unsubscribeSubtasks).forEach(unsub => unsub());
+                unsubscribeSubtasks = {};
+            };
+
             onAuthStateChanged(auth, (user) => {
+                cleanupListeners(); // Always cleanup previous listeners first!
+
                 if (user) { // User is signed in
                     currentUserId = user.uid;
                     userName.textContent = user.displayName;
                     userAvatar.src = user.photoURL;
                     
+                    // Setup UI for logged-in state
                     loginBtn.classList.remove('visible');
                     userInfo.classList.add('visible');
                     mainContent.classList.remove('logged-out');
+                    loggedOutState.classList.add('hidden');
+                    loadingState.classList.remove('hidden');
 
-                    loadTasks(currentUserId);
+                    // Subscribe to tasks
+                    const q = query(collection(db, 'users', user.uid, 'tasks'), orderBy('datetime'));
+                    unsubscribeMain = onSnapshot(q, snapshot => {
+                        loadingState.classList.add('hidden');
+                        tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        renderTasks();
+                    }, error => {
+                        console.error("Error loading tasks: ", error);
+                        loadingState.classList.add('hidden');
+                        showModal('error', 'Erro de Conexão', 'Não foi possível carregar as tarefas. Verifique as regras de segurança do seu Firestore.');
+                    });
+
                 } else { // User is signed out
                     currentUserId = null;
-                    mainTaskListener(); // Unsubscribe from previous user's tasks
-                    Object.values(subtaskListeners).forEach(unsub => unsub());
-                    subtaskListeners = {};
                     tasks = [];
                     
+                    // Setup UI for logged-out state
                     loginBtn.classList.add('visible');
                     userInfo.classList.remove('visible');
                     mainContent.classList.add('logged-out');
-
-                    taskList.innerHTML = '';
+                    
+                    taskList.innerHTML = ''; // Clear visual list
                     loggedOutState.classList.remove('hidden');
                     emptyState.classList.add('hidden');
                     loadingState.classList.add('hidden');
                 }
             });
-            
-            function loadTasks(userId) {
-                loadingState.classList.remove('hidden');
-                loggedOutState.classList.add('hidden');
-
-                const q = query(collection(db, 'users', userId, 'tasks'), orderBy('datetime'));
-                mainTaskListener = onSnapshot(q, snapshot => {
-                    loadingState.classList.add('hidden');
-                    tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderTasks();
-                }, error => {
-                    console.error("Error loading tasks: ", error);
-                    loadingState.classList.add('hidden');
-                    showModal('error', 'Erro de Conexão', 'Não foi possível carregar as tarefas. Verifique as regras de segurança do seu Firestore.');
-                });
-            }
             
             // --- Theme Management ---
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -449,7 +453,7 @@
                 localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
             });
             
-            // --- All other functions (showModal, createTaskElement, etc.) ---
+            // --- UI Functions (Modals, Rendering, etc.) ---
             
             function showGenericModal(modalElement) {
                 modalElement.classList.remove('hidden');
@@ -603,8 +607,7 @@
             };
             const renderTasks = () => {
                 taskList.innerHTML = '';
-                loggedOutState.classList.add('hidden');
-
+                
                 const filter = filterCategory.value;
                 const filteredTasks = tasks.filter(task => {
                     if (filter === 'all') return true;
@@ -677,24 +680,30 @@
                 `;
                 const subtaskContainer = li.querySelector('.subtask-list');
                 const counterElement = li.querySelector('.subtask-counter');
-                loadAndRenderSubtasks(task.id, subtaskContainer, counterElement);
-                return li;
-            };
-            function loadAndRenderSubtasks(taskId, container, counterElement) {
-                const subtaskCollectionRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
+                
+                // Unsubscribe from old listener if it exists before creating a new one
+                const oldUnsubscribe = unsubscribeSubtasks[task.id];
+                if (oldUnsubscribe) {
+                    oldUnsubscribe();
+                }
+                
+                const subtaskCollectionRef = collection(db, 'users', currentUserId, 'tasks', task.id, 'subtasks');
                 const q = query(subtaskCollectionRef, orderBy('createdAt'));
-                if(subtaskListeners[taskId]) subtaskListeners[taskId](); 
-                subtaskListeners[taskId] = onSnapshot(q, (snapshot) => {
-                    container.innerHTML = '';
+                
+                unsubscribeSubtasks[task.id] = onSnapshot(q, (snapshot) => {
+                    subtaskContainer.innerHTML = '';
                     const subtasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     const completedCount = subtasks.filter(st => st.completed).length;
                     if(counterElement) counterElement.textContent = `${completedCount}/${subtasks.length} concluídas`;
-                    const expandBtn = container.closest('.task-item').querySelector('.expand-subtasks-btn');
+                    const expandBtn = li.querySelector('.expand-subtasks-btn');
                     if (subtasks.length > 0) expandBtn.classList.remove('hidden'); else expandBtn.classList.add('hidden');
-                    subtasks.forEach(subtask => container.appendChild(createSubtaskElement(subtask)));
+                    subtasks.forEach(subtask => subtaskContainer.appendChild(createSubtaskElement(subtask)));
                     lucide.createIcons();
                 });
-            }
+
+                return li;
+            };
+           
             const createSubtaskElement = (subtask) => {
                 const li = document.createElement('li');
                 li.className = 'subtask-item flex items-center justify-between bg-white dark:bg-slate-700 p-2.5 rounded-lg border border-slate-200 dark:border-slate-600';
@@ -721,6 +730,8 @@
                 `;
                 return li;
             };
+
+            // --- Data Manipulation Functions ---
             const addTask = async (e) => {
                 e.preventDefault();
                 if (!currentUserId) {
@@ -784,8 +795,9 @@
                     const expandBtn = target.closest('.expand-subtasks-btn');
                     const subtaskList = taskItem.querySelector('.subtask-list');
                     subtaskList.classList.toggle('expanded');
+                    const iconEl = expandBtn.querySelector('i');
                     const iconName = subtaskList.classList.contains('expanded') ? 'chevron-up' : 'chevron-down';
-                    expandBtn.innerHTML = `<i data-lucide="${iconName}" class="w-5 h-5"></i>`;
+                    if (iconEl) iconEl.setAttribute('data-lucide', iconName);
                     lucide.createIcons();
                 } else if (target.closest('.add-subtask-form')) {
                     e.preventDefault();
@@ -820,6 +832,7 @@
                 }
             };
             
+            // --- Notification Functions ---
             function playNotificationSound() {
                 if (!audioCtx) return;
                 const gainNode = audioCtx.createGain();
@@ -828,19 +841,17 @@
 
                 const oscillator = audioCtx.createOscillator();
                 oscillator.connect(gainNode);
-                oscillator.type = 'sine'; // 'sine' provides a clean tone for melodies
+                oscillator.type = 'sine';
 
                 const now = audioCtx.currentTime;
-                const tempo = 0.15; // seconds per note
+                const tempo = 0.15;
 
-                // A longer, more melodic sequence
-                oscillator.frequency.setValueAtTime(523.25, now); // C5
-                oscillator.frequency.setValueAtTime(659.25, now + tempo * 1); // E5
-                oscillator.frequency.setValueAtTime(783.99, now + tempo * 2); // G5
-                oscillator.frequency.setValueAtTime(1046.50, now + tempo * 3); // C6, held longer
-                oscillator.frequency.setValueAtTime(783.99, now + tempo * 5); // G5 to resolve
+                oscillator.frequency.setValueAtTime(523.25, now); 
+                oscillator.frequency.setValueAtTime(659.25, now + tempo * 1);
+                oscillator.frequency.setValueAtTime(783.99, now + tempo * 2);
+                oscillator.frequency.setValueAtTime(1046.50, now + tempo * 3);
+                oscillator.frequency.setValueAtTime(783.99, now + tempo * 5);
 
-                // Fade out over a longer duration for a smoother end
                 gainNode.gain.exponentialRampToValueAtTime(0.00001, now + tempo * 7);
 
                 oscillator.start(now);
@@ -848,19 +859,10 @@
             }
 
             const notifyUser = (task) => {
-                // Show the in-app modal pop-up
-                showModal(
-                    'info', 
-                    'Lembrete de Tarefa!', 
-                    `Sua tarefa "${task.text}" está próxima do vencimento.`
-                );
-
-                // Play the sound
+                showModal('info', 'Lembrete de Tarefa!', `Sua tarefa "${task.text}" está próxima do vencimento.`);
                 playNotificationSound();
-                
-                // If permission is granted, also show the desktop notification
                 if (Notification.permission === 'granted') {
-                    const notification = new Notification('Lembrete de Tarefa!', {
+                    new Notification('Lembrete de Tarefa!', {
                         body: `Sua tarefa "${task.text}" está próxima do vencimento.`,
                         icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>'
                     });
@@ -882,913 +884,7 @@
                 });
             };
 
-            // Event Listeners
-            loginBtn.addEventListener('click', signInWithGoogle);
-            logoutBtn.addEventListener('click', logoutUser);
-            taskForm.addEventListener('submit', addTask);
-            taskList.addEventListener('click', handleTaskListClick);
-            filterCategory.addEventListener('change', renderTasks);
-            modalCloseBtn.addEventListener('click', () => hideGenericModal(notificationModal));
-            editTaskForm.addEventListener('submit', handleUpdateTask);
-            editModalCloseBtn.addEventListener('click', hideEditModal);
-            editSubtaskForm.addEventListener('submit', handleUpdateSubtask);
-            editSubtaskModalCloseBtn.addEventListener('click', hideEditSubtaskModal);
-            apiKeyBtn.addEventListener('click', () => showGenericModal(apiKeyModal));
-            apiKeyModalCloseBtn.addEventListener('click', () => hideGenericModal(apiKeyModal));
-            apiKeyForm.addEventListener('submit', saveApiKey);
-            geminiDecomposeBtn.addEventListener('click', handleGeminiDecompose);
-            taskInput.addEventListener('input', () => { if (geminiApiKey) { geminiDecomposeBtn.disabled = !taskInput.value.trim(); } });
-            
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            taskDatetime.min = now.toISOString().slice(0,16);
-            updateApiKeyStatus();
-            const initAudioContext = () => { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); };
-            document.body.addEventListener('click', initAudioContext, { once: true });
-            
-            if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-                setTimeout(() => {
-                     showModal('info', 'Ativar Notificações?', 'Permita o envio de notificações para receber lembretes de suas tarefas na área de trabalho.');
-                     setTimeout(() => Notification.requestPermission(), 3000);
-                }, 5000);
-            }
-            setInterval(checkReminders, 30000); 
-        });
-    </script>
-</body>
-</html>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Organizador de Tarefas Diárias com IA</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .task-item, .subtask-item { animation: fadeIn 0.3s ease-out; }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        .dark ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
-        .dark ::-webkit-scrollbar-thumb { background: #475569; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-        .dark ::-webkit-scrollbar-thumb:hover { background: #5a6b82; }
-        .completed { text-decoration: line-through; color: #9ca3af; }
-        .dark .completed { color: #64748b; }
-        .completed .task-content, .completed .subtask-content { opacity: 0.7; }
-        .subtask-list {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-in-out;
-        }
-        .subtask-list.expanded {
-            max-height: 500px; /* Adjust as needed */
-        }
-        .gemini-btn:disabled {
-            background-color: #9385c9;
-            cursor: not-allowed;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .loader {
-            border-top-color: #fff;
-            animation: spin 1s linear infinite;
-        }
-        .auth-ui-element {
-            display: none;
-        }
-        .auth-ui-element.visible {
-            display: flex;
-        }
-        .main-content.logged-out {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-    </style>
-</head>
-<body class="bg-slate-100 antialiased text-slate-800 dark:bg-slate-900 dark:text-slate-300">
-
-    <div id="app-container" class="min-h-screen flex flex-col items-center p-4 sm:p-6 lg:p-8">
-        <div class="w-full max-w-6xl mx-auto">
-            
-            <header class="text-center mb-8 relative flex justify-between items-center">
-                <div id="auth-container" class="text-left">
-                     <button id="login-btn" class="auth-ui-element items-center bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-50 dark:hover:bg-slate-600 transition">
-                        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6.36211C16.157 6.03215 17.4337 6.3353 18.2526 7.15424C19.0716 7.97318 19.3747 9.24987 19.0448 10.4068M6.36211 15C6.03215 16.157 6.3353 17.4337 7.15424 18.2526C7.97318 19.0716 9.24987 19.3747 10.4068 19.0448"/><path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C12.3563 3 12.7073 3.01518 13.0519 3.04419"/><path d="M12 8V12L15 14"/></svg>
-                        Entrar com Google
-                    </button>
-                    <div id="user-info" class="auth-ui-element items-center space-x-3">
-                        <img id="user-avatar" class="w-10 h-10 rounded-full" src="" alt="User Avatar">
-                        <div class="text-left">
-                            <p id="user-name" class="font-semibold text-slate-800 dark:text-slate-200"></p>
-                            <button id="logout-btn" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">Sair</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="absolute left-1/2 -translate-x-1/2">
-                    <h1 class="text-4xl font-bold text-slate-900 dark:text-slate-100">Meu Organizador Diário ✨</h1>
-                    <p class="text-slate-600 dark:text-slate-400 mt-2">Planeje seu dia com o poder da IA.</p>
-                </div>
-
-                <button id="theme-toggle" class="p-2 rounded-full text-slate-500 dark:text-yellow-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-300">
-                    <i data-lucide="moon" class="w-6 h-6 block dark:hidden"></i>
-                    <i data-lucide="sun" class="w-6 h-6 hidden dark:block"></i>
-                </button>
-            </header>
-
-            <main id="main-content" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                <!-- Coluna da Esquerda: Adicionar Tarefa -->
-                <aside class="lg:col-span-1">
-                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg sticky top-8 transition-colors duration-300">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-2xl font-semibold flex items-center dark:text-slate-200">
-                                <i data-lucide="plus-circle" class="mr-2"></i>
-                                Nova Tarefa
-                            </h2>
-                            <button id="api-key-btn" class="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-100 dark:hover:bg-slate-700 transition">
-                                <i data-lucide="key-round" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-
-                        <form id="task-form" class="space-y-4">
-                            <div>
-                                <label for="task-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
-                                <input type="text" id="task-input" placeholder="Ex: Organizar festa de aniversário" required
-                                       class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 dark:placeholder-slate-400 transition-colors duration-300">
-                            </div>
-                            <div>
-                                <label for="task-datetime" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data e Hora de Entrega</label>
-                                <input type="datetime-local" id="task-datetime" required
-                                       class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 [color-scheme:dark] transition-colors duration-300">
-                            </div>
-                            <div>
-                                <label for="task-category" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-                                <select id="task-category" class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white dark:bg-slate-700 dark:text-slate-200">
-                                    <option value="trabalho">Trabalho</option>
-                                    <option value="reuniao">Reunião</option>
-                                    <option value="projeto">Projeto</option>
-                                    <option value="pessoal">Pessoal</option>
-                                </select>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="task-reminder" class="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-700">
-                                <label for="task-reminder" class="ml-2 block text-sm text-slate-900 dark:text-slate-200">Ativar lembrete?</label>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition transform hover:scale-105 flex items-center justify-center">
-                                    Adicionar
-                                </button>
-                                <button type="button" id="gemini-decompose-btn" class="w-full bg-purple-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition transform hover:scale-105 flex items-center justify-center gemini-btn" disabled>
-                                    <span class="gemini-btn-text">✨ Decompor</span>
-                                    <div class="loader w-4 h-4 border-2 border-t-transparent rounded-full ml-2 hidden"></div>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </aside>
-
-                <!-- Coluna da Direita: Lista de Tarefas -->
-                <section class="lg:col-span-2">
-                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg transition-colors duration-300">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-200 dark:border-slate-700 pb-4">
-                            <h2 class="text-2xl font-semibold mb-4 sm:mb-0 dark:text-slate-200">Minhas Tarefas</h2>
-                             <div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-sm font-medium">Filtrar:</span>
-                                    <select id="filter-category" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition text-sm bg-white dark:bg-slate-700 dark:text-slate-200">
-                                        <option value="all">Todas</option>
-                                        <option value="trabalho">Trabalho</option>
-                                        <option value="reuniao">Reunião</option>
-                                        <option value="projeto">Projeto</option>
-                                        <option value="pessoal">Pessoal</option>
-                                        <option value="concluidas">Concluídas</option>
-                                        <option value="pendentes">Pendentes</option>
-                                    </select>
-                                </div>
-                                <div class="flex items-center space-x-4 mt-3 text-xs text-slate-500 dark:text-slate-400">
-                                    <span>Legenda:</span>
-                                    <span class="flex items-center"><span class="w-3 h-3 block rounded-full bg-yellow-400 mr-1.5 border border-slate-300 dark:border-slate-500"></span>Vence Hoje</span>
-                                    <span class="flex items-center"><span class="w-3 h-3 block rounded-full bg-red-400 mr-1.5 border border-slate-300 dark:border-slate-500"></span>Atrasada</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <ul id="task-list" class="space-y-4">
-                             <div id="logged-out-state" class="text-center py-12">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/><path d="M21 12c-1.65-3.33-5.02-6-9-6s-7.35 2.67-9 6c1.65 3.33 5.02 6 9 6s7.35-2.67 9 6Z"/><path d="M2 12h20"/></svg>
-                                <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Bem-vindo(a)!</h3>
-                                <p class="mt-1 text-slate-500 dark:text-slate-400">Faça login com sua conta Google para ver e gerenciar suas tarefas.</p>
-                            </div>
-                             <div id="empty-state" class="text-center py-12 hidden">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Z"/><path d="M15 2v20"/><path d="M8 7h4"/><path d="M8 12h4"/><path d="M8 17h4"/></svg>
-                                <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Nenhuma tarefa por aqui!</h3>
-                                <p class="mt-1 text-slate-500 dark:text-slate-400">Adicione uma nova tarefa para começar a se organizar.</p>
-                            </div>
-                            <div id="loading-state" class="text-center py-12 hidden">
-                                <p class="text-slate-500 dark:text-slate-400">Carregando tarefas...</p>
-                            </div>
-                        </ul>
-                    </div>
-                </section>
-            </main>
-        </div>
-    </div>
-    
-    <!-- Modais -->
-    <div id="api-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl transform transition-all scale-95 opacity-0">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Configurar Chave de API do Gemini</h3>
-                <button id="api-key-modal-close-btn" class="p-1 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-slate-700 transition"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Para usar os recursos de IA, você precisa de uma chave de API do Google AI Studio. É grátis e fácil de obter.</p>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-semibold mb-4 inline-block">Obtenha sua chave de API aqui &rarr;</a>
-            <form id="api-key-form">
-                <div>
-                    <label for="api-key-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Sua Chave de API</label>
-                    <input type="password" id="api-key-input" placeholder="Cole sua chave aqui" class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition-colors duration-300">
-                </div>
-                <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">Sua chave é salva apenas nesta sessão do navegador e não é enviada para nossos servidores.</div>
-                <div class="flex justify-end mt-6">
-                    <button type="submit" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-                        Salvar Chave
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <div id="notification-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-sm w-full mx-auto text-center shadow-2xl transform transition-all scale-95 opacity-0">
-            <div id="modal-icon" class="mx-auto mb-4"></div>
-            <h3 id="modal-title" class="text-lg font-semibold text-slate-900 dark:text-slate-100"></h3>
-            <p id="modal-message" class="text-sm text-slate-600 dark:text-slate-400 mt-2 break-words"></p>
-            <button id="modal-close-btn" class="mt-6 bg-indigo-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-                Ok
-            </button>
-        </div>
-    </div>
-    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl transform transition-all scale-95 opacity-0">
-            <h3 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Editar Tarefa Principal</h3>
-            <form id="edit-task-form" class="space-y-4">
-                <input type="hidden" id="edit-task-id">
-                 <div>
-                    <label for="edit-task-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
-                    <input type="text" id="edit-task-input" required class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition">
-                </div>
-                <div>
-                    <label for="edit-task-datetime" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data e Hora de Entrega</label>
-                    <input type="datetime-local" id="edit-task-datetime" required class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 [color-scheme:dark] transition">
-                </div>
-                <div>
-                    <label for="edit-task-category" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-                    <select id="edit-task-category" class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white dark:bg-slate-700 dark:text-slate-200">
-                        <option value="trabalho">Trabalho</option>
-                        <option value="reuniao">Reunião</option>
-                        <option value="projeto">Projeto</option>
-                        <option value="pessoal">Pessoal</option>
-                    </select>
-                </div>
-                <div class="flex items-center">
-                    <input type="checkbox" id="edit-task-reminder" class="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-700">
-                    <label for="edit-task-reminder" class="ml-2 block text-sm text-slate-900 dark:text-slate-200">Ativar lembrete?</label>
-                </div>
-                <div class="flex justify-end space-x-3 mt-6">
-                     <button type="button" id="edit-modal-close-btn" class="bg-slate-100 text-slate-700 font-semibold py-2 px-4 rounded-lg hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 transition">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-                        Salvar Alterações
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <div id="edit-subtask-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl transform transition-all scale-95 opacity-0">
-            <h3 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Editar Subtarefa</h3>
-            <form id="edit-subtask-form" class="space-y-4">
-                <input type="hidden" id="edit-subtask-id">
-                <input type="hidden" id="edit-subtask-parent-id">
-                <div>
-                    <label for="edit-subtask-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
-                    <input type="text" id="edit-subtask-input" required class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition">
-                </div>
-                <div>
-                    <label for="edit-subtask-startdate" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Início</label>
-                    <input type="date" id="edit-subtask-startdate" required class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 [color-scheme:dark] transition">
-                </div>
-                <div class="flex justify-end space-x-3 mt-6">
-                     <button type="button" id="edit-subtask-modal-close-btn" class="bg-slate-100 text-slate-700 font-semibold py-2 px-4 rounded-lg hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 transition">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
-                        Salvar Alterações
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy, writeBatch, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-        // --- Firebase Config ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyDA2xjs4Sxpi6U-qIaZdZIqJJ__UduekoE",
-            authDomain: "tarefas-dc831.firebaseapp.com",
-            projectId: "tarefas-dc831",
-            storageBucket: "tarefas-dc831.firebasestorage.app",
-            messagingSenderId: "385442784567",
-            appId: "1:385442784567:web:9814d7ea51ac774b8c26b2"
-        };
-        if (!firebaseConfig || !firebaseConfig.projectId) {
-            document.getElementById('app-container').innerHTML = `<div class="text-center p-8">Erro Crítico: Configuração do Firebase não encontrada.</div>`;
-            throw new Error("Configuração do Firebase não fornecida.");
-        }
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
-        document.addEventListener('DOMContentLoaded', () => {
-            lucide.createIcons();
-            // --- DOM Elements ---
-            const mainContent = document.getElementById('main-content');
-            const taskForm = document.getElementById('task-form');
-            const taskInput = document.getElementById('task-input');
-            const taskDatetime = document.getElementById('task-datetime');
-            const taskCategory = document.getElementById('task-category');
-            const taskReminder = document.getElementById('task-reminder');
-            const taskList = document.getElementById('task-list');
-            const filterCategory = document.getElementById('filter-category');
-            
-            // State Displays
-            const loggedOutState = document.getElementById('logged-out-state');
-            const emptyState = document.getElementById('empty-state');
-            const loadingState = document.getElementById('loading-state');
-            
-            // Auth UI
-            const loginBtn = document.getElementById('login-btn');
-            const logoutBtn = document.getElementById('logout-btn');
-            const userInfo = document.getElementById('user-info');
-            const userAvatar = document.getElementById('user-avatar');
-            const userName = document.getElementById('user-name');
-
-            // Modals and other elements...
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            const notificationModal = document.getElementById('notification-modal'), modalIcon = document.getElementById('modal-icon'), modalTitle = document.getElementById('modal-title'), modalMessage = document.getElementById('modal-message'), modalCloseBtn = document.getElementById('modal-close-btn');
-            const editModal = document.getElementById('edit-modal'), editTaskForm = document.getElementById('edit-task-form'), editTaskId = document.getElementById('edit-task-id'), editTaskInput = document.getElementById('edit-task-input'), editTaskDatetime = document.getElementById('edit-task-datetime'), editTaskCategory = document.getElementById('edit-task-category'), editTaskReminder = document.getElementById('edit-task-reminder'), editModalCloseBtn = document.getElementById('edit-modal-close-btn');
-            const editSubtaskModal = document.getElementById('edit-subtask-modal'), editSubtaskForm = document.getElementById('edit-subtask-form'), editSubtaskId = document.getElementById('edit-subtask-id'), editSubtaskParentId = document.getElementById('edit-subtask-parent-id'), editSubtaskInput = document.getElementById('edit-subtask-input'), editSubtaskStartDate = document.getElementById('edit-subtask-startdate'), editSubtaskModalCloseBtn = document.getElementById('edit-subtask-modal-close-btn');
-            const apiKeyModal = document.getElementById('api-key-modal'), apiKeyForm = document.getElementById('api-key-form'), apiKeyInput = document.getElementById('api-key-input'), apiKeyBtn = document.getElementById('api-key-btn'), apiKeyModalCloseBtn = document.getElementById('api-key-modal-close-btn');
-            const geminiDecomposeBtn = document.getElementById('gemini-decompose-btn');
-
-            // --- App State ---
-            let currentUserId = null;
-            let tasks = [];
-            let mainTaskListener = () => {};
-            let subtaskListeners = {};
-            let notifiedTasks = new Set();
-            let audioCtx;
-            let geminiApiKey = sessionStorage.getItem('geminiApiKey') || null;
-
-            const categoryConfig = {
-                trabalho: { label: 'Trabalho', color: 'bg-blue-100 dark:bg-blue-900/50', textColor: 'text-blue-800 dark:text-blue-300', icon: 'briefcase' },
-                reuniao: { label: 'Reunião', color: 'bg-purple-100 dark:bg-purple-900/50', textColor: 'text-purple-800 dark:text-purple-300', icon: 'users' },
-                projeto: { label: 'Projeto', color: 'bg-green-100 dark:bg-green-900/50', textColor: 'text-green-800 dark:text-green-300', icon: 'folder-git-2' },
-                pessoal: { label: 'Pessoal', color: 'bg-yellow-100 dark:bg-yellow-900/50', textColor: 'text-yellow-800 dark:text-yellow-300', icon: 'user' }
-            };
-
-            // --- Authentication ---
-            const signInWithGoogle = async () => {
-                const provider = new GoogleAuthProvider();
-                try {
-                    await signInWithPopup(auth, provider);
-                } catch (error) {
-                    console.error("Erro no login com Google:", error);
-                    if (error.code === 'auth/unauthorized-domain') {
-                        const currentOrigin = window.location.origin;
-                        const detailedMessage = `O domínio "${currentOrigin}" não está autorizado. Vá ao seu Console do Firebase > Authentication > Settings > Domínios autorizados e adicione ESTE domínio e também "usercontent.goog" à lista.`;
-                        showModal(
-                            'error', 
-                            'Domínio Não Autorizado', 
-                            detailedMessage
-                        );
-                    } else {
-                        showModal('error', 'Falha no Login', `Não foi possível autenticar. Erro: ${error.message}`);
-                    }
-                }
-            };
-
-            const logoutUser = async () => {
-                try {
-                    await signOut(auth);
-                } catch (error) {
-                    console.error("Erro ao sair:", error);
-                }
-            };
-            
-            onAuthStateChanged(auth, (user) => {
-                if (user) { // User is signed in
-                    currentUserId = user.uid;
-                    userName.textContent = user.displayName;
-                    userAvatar.src = user.photoURL;
-                    
-                    loginBtn.classList.remove('visible');
-                    userInfo.classList.add('visible');
-                    mainContent.classList.remove('logged-out');
-
-                    loadTasks(currentUserId);
-                } else { // User is signed out
-                    currentUserId = null;
-                    mainTaskListener(); // Unsubscribe from previous user's tasks
-                    Object.values(subtaskListeners).forEach(unsub => unsub());
-                    subtaskListeners = {};
-                    tasks = [];
-                    
-                    loginBtn.classList.add('visible');
-                    userInfo.classList.remove('visible');
-                    mainContent.classList.add('logged-out');
-
-                    taskList.innerHTML = '';
-                    loggedOutState.classList.remove('hidden');
-                    emptyState.classList.add('hidden');
-                    loadingState.classList.add('hidden');
-                }
-            });
-            
-            function loadTasks(userId) {
-                loadingState.classList.remove('hidden');
-                loggedOutState.classList.add('hidden');
-
-                const q = query(collection(db, 'users', userId, 'tasks'), orderBy('datetime'));
-                mainTaskListener = onSnapshot(q, snapshot => {
-                    loadingState.classList.add('hidden');
-                    tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderTasks();
-                }, error => {
-                    console.error("Error loading tasks: ", error);
-                    loadingState.classList.add('hidden');
-                    showModal('error', 'Erro de Conexão', 'Não foi possível carregar as tarefas. Verifique as regras de segurança do seu Firestore.');
-                });
-            }
-            
-            // --- Theme Management ---
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            themeToggleBtn.addEventListener('click', () => {
-                document.documentElement.classList.toggle('dark');
-                localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-            });
-            
-            // --- All other functions (showModal, createTaskElement, etc.) remain largely the same ---
-            
-            function showGenericModal(modalElement) {
-                modalElement.classList.remove('hidden');
-                setTimeout(() => {
-                    const content = modalElement.querySelector('div');
-                    if (content) content.classList.add('scale-100', 'opacity-100');
-                }, 10);
-            }
-            function hideGenericModal(modalElement) {
-                 const content = modalElement.querySelector('div');
-                 if (content) content.classList.remove('scale-100', 'opacity-100');
-                setTimeout(() => modalElement.classList.add('hidden'), 200);
-            }
-             function showModal(type, title, message) {
-                const icons = { success: `<svg class="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`, error: `<svg class="h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`, info: `<svg class="h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`, };
-                modalIcon.innerHTML = icons[type] || icons['info'];
-                modalTitle.textContent = title;
-                modalMessage.textContent = message;
-                showGenericModal(notificationModal);
-            }
-            function showEditModal(task) {
-                editTaskId.value = task.id;
-                editTaskInput.value = task.text;
-                editTaskDatetime.value = task.datetime;
-                editTaskCategory.value = task.category;
-                editTaskReminder.checked = task.reminder;
-                showGenericModal(editModal);
-            }
-             function hideEditModal() { hideGenericModal(editModal); }
-
-             function showEditSubtaskModal(subtask, parentTaskId) {
-                editSubtaskId.value = subtask.id;
-                editSubtaskParentId.value = parentTaskId;
-                editSubtaskInput.value = subtask.text;
-                editSubtaskStartDate.value = subtask.startDate;
-                showGenericModal(editSubtaskModal);
-            }
-            function hideEditSubtaskModal() { hideGenericModal(editSubtaskModal); }
-
-            const toggleGeminiLoading = (isLoading) => {
-                const btnText = geminiDecomposeBtn.querySelector('.gemini-btn-text');
-                const loader = geminiDecomposeBtn.querySelector('.loader');
-                if (isLoading) {
-                    geminiDecomposeBtn.disabled = true;
-                    btnText.textContent = 'Pensando...';
-                    loader.classList.remove('hidden');
-                } else {
-                    geminiDecomposeBtn.disabled = !geminiApiKey || !taskInput.value.trim();
-                    btnText.textContent = '✨ Decompor';
-                    loader.classList.add('hidden');
-                }
-            }
-            async function callGeminiAPI(taskText) {
-                if (!geminiApiKey) {
-                    showModal('error', 'Chave de API Faltando', 'Por favor, configure sua chave de API do Gemini para usar esta funcionalidade.');
-                    return null;
-                }
-                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
-
-                const payload = {
-                    contents: [{
-                        parts: [{ text: `Aja como um gerente de projetos. Decomponha a tarefa a seguir em subtarefas acionáveis: "${taskText}"` }]
-                    }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: { "subtasks": { "type": "ARRAY", "items": { "type": "STRING" } } }
-                        }
-                    }
-                };
-                try {
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) {
-                        const errorBody = await response.json();
-                        throw new Error(`Erro da API: ${errorBody.error?.message || response.statusText}`);
-                    }
-                    const result = await response.json();
-                    const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!jsonText) throw new Error("Resposta da API inválida.");
-
-                    const parsed = JSON.parse(jsonText);
-                    return parsed.subtasks || [];
-                } catch (error) {
-                    console.error("Falha ao chamar a API do Gemini: ", error);
-                    showModal('error', 'Erro de IA', `Não foi possível gerar subtarefas. Verifique sua chave de API e a conexão. Detalhe: ${error.message}`);
-                    return null;
-                }
-            }
-            const handleGeminiDecompose = async () => {
-                const text = taskInput.value.trim();
-                const datetime = taskDatetime.value;
-                if (!text || !datetime) {
-                    showModal('error', 'Campos Incompletos', 'Preencha a descrição e a data/hora da tarefa antes de usar a IA.');
-                    return;
-                }
-                toggleGeminiLoading(true);
-                const subtasks = await callGeminiAPI(text);
-                toggleGeminiLoading(false);
-
-                if (subtasks && subtasks.length > 0) {
-                    const newTask = { text, datetime, category: taskCategory.value, reminder: taskReminder.checked, completed: false, createdAt: new Date() };
-                    try {
-                        const mainTaskRef = await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
-                        const mainTaskId = mainTaskRef.id;
-
-                        const today = new Date().toISOString().split('T')[0];
-                        const batch = writeBatch(db);
-                        subtasks.forEach(subtaskText => {
-                            const newSubtask = { text: subtaskText, startDate: today, completed: false, completionDate: null, createdAt: new Date() };
-                            const subtaskRef = doc(collection(db, 'users', currentUserId, 'tasks', mainTaskId, 'subtasks'));
-                            batch.set(subtaskRef, newSubtask);
-                        });
-                        await batch.commit();
-
-                        showModal('success', 'Tarefa Criada com IA!', 'A tarefa principal e as subtarefas geradas foram salvas.');
-                        taskForm.reset();
-                    } catch (error) {
-                        console.error("Erro ao salvar tarefa e subtarefas:", error);
-                        showModal('error', 'Erro ao Salvar', 'Não foi possível salvar a tarefa gerada pela IA.');
-                    }
-                } else if (subtasks) {
-                     showModal('info', 'Nenhuma Subtarefa Gerada', 'A IA não conseguiu decompor esta tarefa. Tente ser mais específico.');
-                }
-            }
-            const updateApiKeyStatus = () => {
-                if (geminiApiKey) {
-                    apiKeyBtn.classList.remove('text-slate-400', 'hover:text-indigo-600', 'hover:bg-indigo-100');
-                    apiKeyBtn.classList.add('text-green-600', 'hover:text-green-700', 'hover:bg-green-100', 'dark:text-green-500', 'dark:hover:bg-green-900/50');
-                    geminiDecomposeBtn.disabled = !taskInput.value.trim();
-                } else {
-                    apiKeyBtn.classList.add('text-slate-400', 'hover:text-indigo-600', 'hover:bg-indigo-100');
-                    apiKeyBtn.classList.remove('text-green-600', 'hover:text-green-700', 'hover:bg-green-100', 'dark:text-green-500', 'dark:hover:bg-green-900/50');
-                    geminiDecomposeBtn.disabled = true;
-                }
-            };
-            const saveApiKey = (e) => {
-                e.preventDefault();
-                const key = apiKeyInput.value.trim();
-                if (key) {
-                    sessionStorage.setItem('geminiApiKey', key);
-                    geminiApiKey = key;
-                    updateApiKeyStatus();
-                    hideGenericModal(apiKeyModal);
-                    showModal('success', 'Chave Salva!', 'Sua chave de API do Gemini foi salva para esta sessão.');
-                }
-            };
-            const renderTasks = () => {
-                taskList.innerHTML = '';
-                loggedOutState.classList.add('hidden');
-
-                const filter = filterCategory.value;
-                const filteredTasks = tasks.filter(task => {
-                    if (filter === 'all') return true;
-                    if (filter === 'concluidas') return task.completed;
-                    if (filter === 'pendentes') return !task.completed;
-                    return task.category === filter;
-                });
-
-                if (filteredTasks.length === 0) {
-                    emptyState.classList.remove('hidden');
-                } else {
-                    emptyState.classList.add('hidden');
-                    filteredTasks.forEach(task => {
-                        const taskElement = createTaskElement(task);
-                        taskList.appendChild(taskElement);
-                    });
-                }
-                lucide.createIcons();
-            };
-            const createTaskElement = (task) => {
-                const li = document.createElement('li');
-                li.className = `task-item bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 transition-colors duration-300 border-l-4 ${task.completed ? 'border-slate-300 dark:border-slate-600' : 'border-indigo-500 dark:border-indigo-400'}`;
-                li.dataset.id = task.id;
-
-                const config = categoryConfig[task.category] || { label: 'Geral', color: 'bg-slate-100 dark:bg-slate-700', textColor: 'text-slate-800 dark:text-slate-200', icon: 'tag' };
-                const deadline = new Date(task.datetime);
-                const now = new Date();
-                const isLate = deadline < now && !task.completed;
-                const isToday = deadline.toDateString() === now.toDateString() && !task.completed;
-
-                if (isLate) li.classList.replace('border-indigo-500', 'border-red-400');
-                if (isToday) li.classList.replace('border-indigo-500', 'border-yellow-400');
-                if (isLate) li.classList.replace('dark:border-indigo-400', 'dark:border-red-500');
-                if (isToday) li.classList.replace('dark:border-indigo-400', 'dark:border-yellow-500');
-                
-                const formattedDate = deadline.toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'});
-
-                li.innerHTML = `
-                    <div class="flex items-start justify-between">
-                        <div class="flex items-start">
-                            <input type="checkbox" class="task-checkbox mt-1 h-5 w-5 rounded border-gray-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-700" ${task.completed ? 'checked' : ''}>
-                            <div class="ml-4">
-                                <p class="task-content font-semibold ${task.completed ? 'completed' : ''}">${task.text}</p>
-                                <div class="flex items-center text-xs text-slate-500 dark:text-slate-400 mt-1 space-x-4">
-                                    <span class="flex items-center"><i data-lucide="calendar" class="w-3.5 h-3.5 mr-1.5"></i>${formattedDate}</span>
-                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${config.color} ${config.textColor} flex items-center"><i data-lucide="${config.icon}" class="w-3.5 h-3.5 mr-1.5"></i>${config.label}</span>
-                                    <span class="subtask-counter font-medium"></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-1">
-                            ${task.reminder ? '<i data-lucide="bell" class="w-4 h-4 text-slate-400 dark:text-slate-500" title="Lembrete ativo"></i>' : ''}
-                            <button class="add-subtask-btn p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-100 dark:hover:bg-slate-700 transition"><i data-lucide="list-plus" class="w-5 h-5"></i></button>
-                            <button class="expand-subtasks-btn p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-100 dark:hover:bg-slate-700 transition hidden"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
-                            <button class="edit-task-btn p-2 text-slate-400 hover:text-green-600 rounded-full hover:bg-green-100 dark:hover:bg-slate-700 transition"><i data-lucide="pencil" class="w-5 h-5"></i></button>
-                            <button class="delete-task-btn p-2 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-slate-700 transition"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                        </div>
-                    </div>
-                    <div class="subtask-container pl-9 mt-3">
-                         <form class="add-subtask-form space-y-2 hidden mt-2">
-                             <input type="text" placeholder="Nova subtarefa..." required class="w-full text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 dark:bg-slate-600 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition dark:text-slate-200 dark:placeholder-slate-400">
-                             <div class="flex items-center space-x-2">
-                                 <input type="date" required class="w-full text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 dark:bg-slate-600 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition dark:text-slate-200 [color-scheme:dark]">
-                                 <button type="submit" class="bg-indigo-500 text-white font-semibold py-1.5 px-3 rounded-lg hover:bg-indigo-600 text-sm">Salvar</button>
-                                 <button type="button" class="cancel-subtask-btn bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-semibold py-1.5 px-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 text-sm">Cancelar</button>
-                             </div>
-                         </form>
-                         <ul class="subtask-list space-y-2 mt-2"></ul>
-                    </div>
-                `;
-                const subtaskContainer = li.querySelector('.subtask-list');
-                const counterElement = li.querySelector('.subtask-counter');
-                loadAndRenderSubtasks(task.id, subtaskContainer, counterElement);
-                return li;
-            };
-            function loadAndRenderSubtasks(taskId, container, counterElement) {
-                const subtaskCollectionRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
-                const q = query(subtaskCollectionRef, orderBy('createdAt'));
-                if(subtaskListeners[taskId]) subtaskListeners[taskId](); 
-                subtaskListeners[taskId] = onSnapshot(q, (snapshot) => {
-                    container.innerHTML = '';
-                    const subtasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    const completedCount = subtasks.filter(st => st.completed).length;
-                    if(counterElement) counterElement.textContent = `${completedCount}/${subtasks.length} concluídas`;
-                    const expandBtn = container.closest('.task-item').querySelector('.expand-subtasks-btn');
-                    if (subtasks.length > 0) expandBtn.classList.remove('hidden'); else expandBtn.classList.add('hidden');
-                    subtasks.forEach(subtask => container.appendChild(createSubtaskElement(subtask)));
-                    lucide.createIcons();
-                });
-            }
-            const createSubtaskElement = (subtask) => {
-                const li = document.createElement('li');
-                li.className = 'subtask-item flex items-center justify-between bg-white dark:bg-slate-700 p-2.5 rounded-lg border border-slate-200 dark:border-slate-600';
-                li.dataset.id = subtask.id;
-                const startDate = new Date(subtask.startDate + 'T00:00:00');
-                const formattedStartDate = startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                let completionDateText = '';
-                if(subtask.completed && subtask.completionDate) {
-                     const completionDate = new Date(subtask.completionDate);
-                     completionDateText = ` - Concluída em ${completionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`;
-                }
-                li.innerHTML = `
-                    <div class="flex items-center">
-                        <input type="checkbox" class="subtask-checkbox h-4 w-4 rounded border-gray-300 dark:border-slate-500 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-600" ${subtask.completed ? 'checked' : ''}>
-                        <div class="ml-3 text-sm">
-                            <p class="subtask-content ${subtask.completed ? 'completed' : ''}">${subtask.text}</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">Início: ${formattedStartDate}${completionDateText}</p>
-                        </div>
-                    </div>
-                     <div class="flex items-center space-x-1">
-                        <button class="edit-subtask-btn p-1.5 text-slate-400 hover:text-green-600 rounded-full hover:bg-green-100 dark:hover:bg-slate-600 transition"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                        <button class="delete-subtask-btn p-1.5 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-slate-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    </div>
-                `;
-                return li;
-            };
-            const addTask = async (e) => {
-                e.preventDefault();
-                if (!currentUserId) {
-                    showModal('error', 'Login Necessário', 'Você precisa estar logado para adicionar uma tarefa.');
-                    return;
-                }
-                const text = taskInput.value.trim();
-                const datetime = taskDatetime.value;
-                if (!text || !datetime) return;
-                const newTask = { text, datetime, category: taskCategory.value, reminder: taskReminder.checked, completed: false, createdAt: new Date() };
-                try {
-                    await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
-                    taskForm.reset();
-                } catch (error) { console.error("Error adding document: ", error); }
-            };
-            const handleUpdateTask = async (e) => {
-                e.preventDefault();
-                const id = editTaskId.value;
-                const updatedData = { text: editTaskInput.value, datetime: editTaskDatetime.value, category: editTaskCategory.value, reminder: editTaskReminder.checked };
-                try {
-                    await updateDoc(doc(db, 'users', currentUserId, 'tasks', id), updatedData);
-                    hideEditModal();
-                } catch (error) { console.error("Error updating document: ", error); }
-            };
-            const handleUpdateSubtask = async (e) => {
-                e.preventDefault();
-                const id = editSubtaskId.value;
-                const parentId = editSubtaskParentId.value;
-                const updatedData = { text: editSubtaskInput.value, startDate: editSubtaskStartDate.value };
-                try {
-                    await updateDoc(doc(db, 'users', currentUserId, 'tasks', parentId, 'subtasks', id), updatedData);
-                    hideEditSubtaskModal();
-                } catch (error) { console.error("Error updating subtask: ", error); }
-            };
-            const handleTaskListClick = async (e) => {
-                if (!currentUserId) return;
-                const target = e.target;
-                const taskItem = target.closest('.task-item');
-                if (!taskItem) return;
-                const taskId = taskItem.dataset.id;
-                const task = tasks.find(t => t.id === taskId);
-                
-                if (target.classList.contains('task-checkbox')) {
-                    await updateDoc(doc(db, 'users', currentUserId, 'tasks', taskId), { completed: target.checked });
-                } else if (target.closest('.delete-task-btn')) {
-                     const subtasksRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
-                     const subtasksSnapshot = await getDocs(subtasksRef);
-                     const batch = writeBatch(db);
-                     subtasksSnapshot.forEach((doc) => batch.delete(doc.ref));
-                     await batch.commit();
-                    await deleteDoc(doc(db, 'users', currentUserId, 'tasks', taskId));
-                } else if (target.closest('.edit-task-btn')) {
-                    showEditModal(task);
-                } else if (target.closest('.add-subtask-btn')) {
-                    const form = taskItem.querySelector('.add-subtask-form');
-                    form.classList.toggle('hidden');
-                    form.querySelector('input[type="text"]').focus();
-                } else if (target.closest('.cancel-subtask-btn')) {
-                    target.closest('form').classList.add('hidden');
-                } else if (target.closest('.expand-subtasks-btn')) {
-                    const expandBtn = target.closest('.expand-subtasks-btn');
-                    const subtaskList = taskItem.querySelector('.subtask-list');
-                    subtaskList.classList.toggle('expanded');
-                    const iconName = subtaskList.classList.contains('expanded') ? 'chevron-up' : 'chevron-down';
-                    expandBtn.innerHTML = `<i data-lucide="${iconName}" class="w-5 h-5"></i>`;
-                    lucide.createIcons();
-                } else if (target.closest('.add-subtask-form')) {
-                    e.preventDefault();
-                    const form = target.closest('.add-subtask-form');
-                    const textInput = form.querySelector('input[type="text"]');
-                    const dateInput = form.querySelector('input[type="date"]');
-                    const text = textInput.value.trim();
-                    const startDate = dateInput.value;
-                    if (text && startDate) {
-                        const newSubtask = { text, startDate, completed: false, completionDate: null, createdAt: new Date() };
-                        await addDoc(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'), newSubtask);
-                        form.reset();
-                        form.classList.add('hidden');
-                    }
-                }
-                const subtaskItem = target.closest('.subtask-item');
-                if (subtaskItem) {
-                    const subtaskId = subtaskItem.dataset.id;
-                    const subtaskRef = doc(db, 'users', currentUserId, 'tasks', taskId, 'subtasks', subtaskId);
-                    if (target.classList.contains('subtask-checkbox')) {
-                        const isCompleted = target.checked;
-                        const updateData = { completed: isCompleted, completionDate: isCompleted ? new Date().toISOString().split('T')[0] : null };
-                        await updateDoc(subtaskRef, updateData);
-                    } else if(target.closest('.delete-subtask-btn')) {
-                        await deleteDoc(subtaskRef);
-                    } else if(target.closest('.edit-subtask-btn')) {
-                        const subtaskDoc = await getDoc(subtaskRef);
-                        if (subtaskDoc.exists()) {
-                            showEditSubtaskModal({id: subtaskDoc.id, ...subtaskDoc.data()}, taskId);
-                        }
-                    }
-                }
-            };
-            
-            function playNotificationSound() {
-                if (!audioCtx) return;
-                // Cria um som mais melódico e agradável
-                const gainNode = audioCtx.createGain();
-                gainNode.connect(audioCtx.destination);
-                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // Volume um pouco mais baixo
-
-                const oscillator = audioCtx.createOscillator();
-                oscillator.connect(gainNode);
-                oscillator.type = 'triangle'; // Um timbre mais suave que 'sine'
-
-                // Sequência de 3 notas rápidas (um arpejo)
-                const now = audioCtx.currentTime;
-                oscillator.frequency.setValueAtTime(523.25, now); // C5
-                oscillator.frequency.setValueAtTime(659.25, now + 0.1); // E5
-                oscillator.frequency.setValueAtTime(783.99, now + 0.2); // G5
-
-                // Efeito de "fade out" para suavizar o final
-                gainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.5);
-
-                oscillator.start(now);
-                oscillator.stop(now + 0.5);
-            }
-
-            const notifyUser = (task) => {
-                if (Notification.permission === 'granted') {
-                    const notification = new Notification('Lembrete de Tarefa!', {
-                        body: `Sua tarefa "${task.text}" está próxima do vencimento.`,
-                        icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>'
-                    });
-                    playNotificationSound();
-                }
-            };
-            const checkReminders = () => {
-                if (!currentUserId) return;
-                const now = new Date();
-                tasks.forEach(task => {
-                    if (task.reminder && !task.completed && !notifiedTasks.has(task.id)) {
-                        const taskTime = new Date(task.datetime);
-                        const diffMinutes = (taskTime - now) / (1000 * 60);
-                        if (diffMinutes > 0 && diffMinutes <= 5) {
-                            notifyUser(task);
-                            notifiedTasks.add(task.id);
-                        }
-                    }
-                });
-            };
-
-            // Event Listeners
+            // --- Initial Setup & Event Listeners ---
             loginBtn.addEventListener('click', signInWithGoogle);
             logoutBtn.addEventListener('click', logoutUser);
             taskForm.addEventListener('submit', addTask);
