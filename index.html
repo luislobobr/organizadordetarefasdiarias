@@ -65,6 +65,7 @@
         .main-content.logged-out .content-wrapper {
              opacity: 0.2;
              pointer-events: none;
+             filter: blur(4px);
         }
     </style>
 </head>
@@ -100,10 +101,10 @@
             </header>
 
             <div id="main-content" class="relative">
-                <div id="logged-out-state" class="absolute inset-0 flex-col items-center justify-center text-center py-12 z-10 hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/><path d="M21 12c-1.65-3.33-5.02-6-9-6s-7.35 2.67-9 6c1.65 3.33 5.02 6 9 6s7.35-2.67 9 6Z"/><path d="M2 12h20"/></svg>
-                    <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Bem-vindo(a)!</h3>
-                    <p class="mt-1 text-slate-500 dark:text-slate-400">Faça login com sua conta Google para ver e gerenciar suas tarefas.</p>
+                <div id="logged-out-state" class="absolute inset-0 flex-col items-center justify-center text-center py-12 z-10 hidden bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-2xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-indigo-500"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
+                    <h3 class="mt-4 text-2xl font-bold text-slate-800 dark:text-slate-200">Sua Central de Produtividade</h3>
+                    <p class="mt-2 max-w-md mx-auto text-slate-600 dark:text-slate-400">Faça login com sua conta Google para acessar suas tarefas, criar subtarefas, receber lembretes e muito mais. Tudo salvo e sincronizado na nuvem.</p>
                 </div>
 
                 <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 content-wrapper">
@@ -295,6 +296,28 @@
             </form>
         </div>
     </div>
+    <div id="notes-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-lg w-full mx-auto shadow-2xl transform transition-all scale-95 opacity-0">
+            <h3 id="notes-modal-title" class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center">
+                <i data-lucide="notebook-pen" class="mr-2"></i> Anotações da Tarefa
+            </h3>
+            <form id="notes-form">
+                <input type="hidden" id="notes-doc-path">
+                <div>
+                    <label for="notes-textarea" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Detalhes e anotações</label>
+                    <textarea id="notes-textarea" rows="8" class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 transition resize-y" placeholder="Adicione links, descrições detalhadas ou qualquer outra informação aqui..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                     <button type="button" id="notes-modal-close-btn" class="bg-slate-100 text-slate-700 font-semibold py-2 px-4 rounded-lg hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 transition">
+                        Fechar
+                    </button>
+                    <button type="submit" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
+                        Salvar Anotações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -331,25 +354,23 @@
             const taskList = document.getElementById('task-list');
             const filterCategory = document.getElementById('filter-category');
             
-            // State Displays
             const loggedOutState = document.getElementById('logged-out-state');
             const emptyState = document.getElementById('empty-state');
             const loadingState = document.getElementById('loading-state');
             
-            // Auth UI
             const loginBtn = document.getElementById('login-btn');
             const logoutBtn = document.getElementById('logout-btn');
             const userInfo = document.getElementById('user-info');
             const userAvatar = document.getElementById('user-avatar');
             const userName = document.getElementById('user-name');
 
-            // Modals and other elements...
             const themeToggleBtn = document.getElementById('theme-toggle');
             const notificationModal = document.getElementById('notification-modal'), modalIcon = document.getElementById('modal-icon'), modalTitle = document.getElementById('modal-title'), modalMessage = document.getElementById('modal-message'), modalCloseBtn = document.getElementById('modal-close-btn');
             const editModal = document.getElementById('edit-modal'), editTaskForm = document.getElementById('edit-task-form'), editTaskId = document.getElementById('edit-task-id'), editTaskInput = document.getElementById('edit-task-input'), editTaskDatetime = document.getElementById('edit-task-datetime'), editTaskCategory = document.getElementById('edit-task-category'), editTaskReminder = document.getElementById('edit-task-reminder'), editModalCloseBtn = document.getElementById('edit-modal-close-btn');
             const editSubtaskModal = document.getElementById('edit-subtask-modal'), editSubtaskForm = document.getElementById('edit-subtask-form'), editSubtaskId = document.getElementById('edit-subtask-id'), editSubtaskParentId = document.getElementById('edit-subtask-parent-id'), editSubtaskInput = document.getElementById('edit-subtask-input'), editSubtaskStartDate = document.getElementById('edit-subtask-startdate'), editSubtaskModalCloseBtn = document.getElementById('edit-subtask-modal-close-btn');
             const apiKeyModal = document.getElementById('api-key-modal'), apiKeyForm = document.getElementById('api-key-form'), apiKeyInput = document.getElementById('api-key-input'), apiKeyBtn = document.getElementById('api-key-btn'), apiKeyModalCloseBtn = document.getElementById('api-key-modal-close-btn');
             const geminiDecomposeBtn = document.getElementById('gemini-decompose-btn');
+            const notesModal = document.getElementById('notes-modal'), notesForm = document.getElementById('notes-form'), notesDocPath = document.getElementById('notes-doc-path'), notesTextarea = document.getElementById('notes-textarea'), notesModalCloseBtn = document.getElementById('notes-modal-close-btn'), notesModalTitle = document.getElementById('notes-modal-title');
 
             // --- App State ---
             let currentUserId = null;
@@ -388,7 +409,6 @@
             };
             
             onAuthStateChanged(auth, (user) => {
-                // Clear previous user's data and listeners first
                 unsubscribeMainTasks();
                 Object.values(subtaskListeners).forEach(unsub => unsub());
                 subtaskListeners = {};
@@ -425,7 +445,6 @@
             function loadTasks(userId) {
                 loadingState.classList.remove('hidden');
                 emptyState.classList.add('hidden');
-
                 const q = query(collection(db, 'users', userId, 'tasks'), orderBy('datetime'));
                 unsubscribeMainTasks = onSnapshot(q, snapshot => {
                     loadingState.classList.add('hidden');
@@ -476,7 +495,6 @@
                 showGenericModal(editModal);
             }
              function hideEditModal() { hideGenericModal(editModal); }
-
              function showEditSubtaskModal(subtask, parentTaskId) {
                 editSubtaskId.value = subtask.id;
                 editSubtaskParentId.value = parentTaskId;
@@ -485,7 +503,26 @@
                 showGenericModal(editSubtaskModal);
             }
             function hideEditSubtaskModal() { hideGenericModal(editSubtaskModal); }
-
+            const showNotesModal = async (path, title) => {
+                const docRef = doc(db, path);
+                try {
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        notesDocPath.value = path;
+                        notesTextarea.value = data.notes || '';
+                        notesModalTitle.innerHTML = `<i data-lucide="notebook-pen" class="mr-2"></i> ${title}`;
+                        lucide.createIcons();
+                        showGenericModal(notesModal);
+                    } else {
+                        showModal('error', 'Erro', 'Documento não encontrado.');
+                    }
+                } catch (error) {
+                    console.error("Error fetching notes:", error);
+                    showModal('error', 'Erro', 'Não foi possível carregar as anotações.');
+                }
+            };
+            
             // --- Gemini API ---
             const toggleGeminiLoading = (isLoading) => {
                 const btnText = geminiDecomposeBtn.querySelector('.gemini-btn-text');
@@ -506,25 +543,9 @@
                     return null;
                 }
                 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
-
-                const payload = {
-                    contents: [{
-                        parts: [{ text: `Aja como um gerente de projetos. Decomponha a tarefa a seguir em subtarefas acionáveis: "${taskText}"` }]
-                    }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: { "subtasks": { "type": "ARRAY", "items": { "type": "STRING" } } }
-                        }
-                    }
-                };
+                const payload = { contents: [{ parts: [{ text: `Aja como um gerente de projetos. Decomponha a tarefa a seguir em subtarefas acionáveis: "${taskText}"` }] }], generationConfig: { responseMimeType: "application/json", responseSchema: { type: "OBJECT", properties: { "subtasks": { "type": "ARRAY", "items": { "type": "STRING" } } } } } };
                 try {
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
+                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     if (!response.ok) {
                         const errorBody = await response.json();
                         throw new Error(`Erro da API: ${errorBody.error?.message || response.statusText}`);
@@ -532,12 +553,11 @@
                     const result = await response.json();
                     const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!jsonText) throw new Error("Resposta da API inválida.");
-
                     const parsed = JSON.parse(jsonText);
                     return parsed.subtasks || [];
                 } catch (error) {
                     console.error("Falha ao chamar a API do Gemini: ", error);
-                    showModal('error', 'Erro de IA', `Não foi possível gerar subtarefas. Verifique sua chave de API e a conexão. Detalhe: ${error.message}`);
+                    showModal('error', 'Erro de IA', `Não foi possível gerar subtarefas. Detalhe: ${error.message}`);
                     return null;
                 }
             }
@@ -553,20 +573,18 @@
                 toggleGeminiLoading(false);
 
                 if (subtasks && subtasks.length > 0) {
-                    const newTask = { text, datetime, category: taskCategory.value, reminder: taskReminder.checked, completed: false, createdAt: new Date() };
+                    const newTask = { text, datetime, category: taskCategory.value, reminder: taskReminder.checked, completed: false, createdAt: new Date(), notes: "" };
                     try {
                         const mainTaskRef = await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
                         const mainTaskId = mainTaskRef.id;
-
                         const today = new Date().toISOString().split('T')[0];
                         const batch = writeBatch(db);
                         subtasks.forEach(subtaskText => {
-                            const newSubtask = { text: subtaskText, startDate: today, completed: false, completionDate: null, createdAt: new Date() };
+                            const newSubtask = { text: subtaskText, startDate: today, completed: false, completionDate: null, createdAt: new Date(), notes: "" };
                             const subtaskRef = doc(collection(db, 'users', currentUserId, 'tasks', mainTaskId, 'subtasks'));
                             batch.set(subtaskRef, newSubtask);
                         });
                         await batch.commit();
-
                         showModal('success', 'Tarefa Criada com IA!', 'A tarefa principal e as subtarefas geradas foram salvas.');
                         taskForm.reset();
                     } catch (error) {
@@ -579,11 +597,9 @@
             }
             const updateApiKeyStatus = () => {
                 if (geminiApiKey) {
-                    apiKeyBtn.classList.remove('text-slate-400', 'hover:text-indigo-600', 'hover:bg-indigo-100');
                     apiKeyBtn.classList.add('text-green-600', 'hover:text-green-700', 'hover:bg-green-100', 'dark:text-green-500', 'dark:hover:bg-green-900/50');
                     geminiDecomposeBtn.disabled = !taskInput.value.trim();
                 } else {
-                    apiKeyBtn.classList.add('text-slate-400', 'hover:text-indigo-600', 'hover:bg-indigo-100');
                     apiKeyBtn.classList.remove('text-green-600', 'hover:text-green-700', 'hover:bg-green-100', 'dark:text-green-500', 'dark:hover:bg-green-900/50');
                     geminiDecomposeBtn.disabled = true;
                 }
@@ -603,7 +619,6 @@
             // --- Task Rendering & Management ---
             const renderTasks = () => {
                 taskList.innerHTML = '';
-                
                 const filter = filterCategory.value;
                 const filteredTasks = tasks.filter(task => {
                     if (filter === 'all') return true;
@@ -611,7 +626,6 @@
                     if (filter === 'pendentes') return !task.completed;
                     return task.category === filter;
                 });
-
                 if (filteredTasks.length === 0) {
                     emptyState.classList.remove('hidden');
                 } else {
@@ -641,6 +655,7 @@
                 if (isToday) li.classList.replace('dark:border-indigo-400', 'dark:border-yellow-500');
                 
                 const formattedDate = deadline.toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+                const hasNotes = task.notes && task.notes.trim() !== '';
 
                 li.innerHTML = `
                     <div class="flex items-start justify-between">
@@ -657,6 +672,7 @@
                         </div>
                         <div class="flex items-center space-x-1">
                             ${task.reminder ? '<i data-lucide="bell" class="w-4 h-4 text-slate-400 dark:text-slate-500" title="Lembrete ativo"></i>' : ''}
+                            <button class="notes-task-btn p-2 rounded-full hover:bg-yellow-100 dark:hover:bg-slate-700 transition ${hasNotes ? 'text-yellow-600 dark:text-yellow-500' : 'text-slate-400'}"><i data-lucide="notebook-pen" class="w-5 h-5"></i></button>
                             <button class="add-subtask-btn p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-100 dark:hover:bg-slate-700 transition"><i data-lucide="list-plus" class="w-5 h-5"></i></button>
                             <button class="expand-subtasks-btn p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-100 dark:hover:bg-slate-700 transition hidden"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
                             <button class="edit-task-btn p-2 text-slate-400 hover:text-green-600 rounded-full hover:bg-green-100 dark:hover:bg-slate-700 transition"><i data-lucide="pencil" class="w-5 h-5"></i></button>
@@ -684,7 +700,7 @@
                 const subtaskCollectionRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
                 const q = query(subtaskCollectionRef, orderBy('createdAt'));
                 
-                if(subtaskListeners[taskId]) subtaskListeners[taskId](); // Unsubscribe from previous listener for this task
+                if(subtaskListeners[taskId]) subtaskListeners[taskId](); 
                 
                 subtaskListeners[taskId] = onSnapshot(q, (snapshot) => {
                     container.innerHTML = '';
@@ -696,14 +712,15 @@
                     const expandBtn = container.closest('.task-item').querySelector('.expand-subtasks-btn');
                     if (subtasks.length > 0) expandBtn.classList.remove('hidden'); else expandBtn.classList.add('hidden');
                     
-                    subtasks.forEach(subtask => container.appendChild(createSubtaskElement(subtask)));
+                    subtasks.forEach(subtask => container.appendChild(createSubtaskElement(subtask, taskId)));
                     lucide.createIcons();
                 });
             }
-            const createSubtaskElement = (subtask) => {
+            const createSubtaskElement = (subtask, parentTaskId) => {
                 const li = document.createElement('li');
                 li.className = 'subtask-item flex items-center justify-between bg-white dark:bg-slate-700 p-2.5 rounded-lg border border-slate-200 dark:border-slate-600';
                 li.dataset.id = subtask.id;
+                li.dataset.parentId = parentTaskId;
                 const startDate = new Date(subtask.startDate + 'T00:00:00');
                 const formattedStartDate = startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                 let completionDateText = '';
@@ -711,6 +728,8 @@
                      const completionDate = new Date(subtask.completionDate);
                      completionDateText = ` - Concluída em ${completionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`;
                 }
+                const hasNotes = subtask.notes && subtask.notes.trim() !== '';
+
                 li.innerHTML = `
                     <div class="flex items-center">
                         <input type="checkbox" class="subtask-checkbox h-4 w-4 rounded border-gray-300 dark:border-slate-500 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-600" ${subtask.completed ? 'checked' : ''}>
@@ -720,6 +739,7 @@
                         </div>
                     </div>
                      <div class="flex items-center space-x-1">
+                        <button class="notes-subtask-btn p-1.5 rounded-full hover:bg-yellow-100 dark:hover:bg-slate-600 transition ${hasNotes ? 'text-yellow-600 dark:text-yellow-500' : 'text-slate-400'}"><i data-lucide="notebook-pen" class="w-4 h-4"></i></button>
                         <button class="edit-subtask-btn p-1.5 text-slate-400 hover:text-green-600 rounded-full hover:bg-green-100 dark:hover:bg-slate-600 transition"><i data-lucide="pencil" class="w-4 h-4"></i></button>
                         <button class="delete-subtask-btn p-1.5 text-slate-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-slate-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </div>
@@ -728,18 +748,29 @@
             };
             const addTask = async (e) => {
                 e.preventDefault();
-                if (!currentUserId) {
-                    showModal('error', 'Login Necessário', 'Você precisa estar logado para adicionar uma tarefa.');
-                    return;
-                }
+                if (!currentUserId) return;
                 const text = taskInput.value.trim();
                 const datetime = taskDatetime.value;
                 if (!text || !datetime) return;
-                const newTask = { text, datetime, category: taskCategory.value, reminder: taskReminder.checked, completed: false, createdAt: new Date() };
+                const newTask = { text, datetime, category: taskCategory.value, reminder: taskReminder.checked, completed: false, createdAt: new Date(), notes: "" };
                 try {
                     await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
                     taskForm.reset();
                 } catch (error) { console.error("Error adding document: ", error); }
+            };
+            const handleSaveNotes = async (e) => {
+                e.preventDefault();
+                const path = notesDocPath.value;
+                const notes = notesTextarea.value;
+                if (!path) return;
+                const docRef = doc(db, path);
+                try {
+                    await updateDoc(docRef, { notes: notes });
+                    hideGenericModal(notesModal);
+                } catch (error) {
+                    console.error("Error saving notes:", error);
+                    showModal('error', 'Erro ao Salvar', 'Não foi possível salvar as anotações.');
+                }
             };
             const handleUpdateTask = async (e) => {
                 e.preventDefault();
@@ -766,8 +797,41 @@
                 const taskItem = target.closest('.task-item');
                 if (!taskItem) return;
                 const taskId = taskItem.dataset.id;
-                const task = tasks.find(t => t.id === taskId);
                 
+                if (target.closest('.notes-task-btn')) {
+                    const path = `users/${currentUserId}/tasks/${taskId}`;
+                    const task = tasks.find(t => t.id === taskId);
+                    showNotesModal(path, `Anotações para "${task.text}"`);
+                    return;
+                }
+                
+                const subtaskItem = target.closest('.subtask-item');
+                if (subtaskItem) {
+                    const subtaskId = subtaskItem.dataset.id;
+                    const subtaskParentId = subtaskItem.dataset.parentId;
+                    const subtaskRef = doc(db, 'users', currentUserId, 'tasks', subtaskParentId, 'subtasks', subtaskId);
+                    
+                    if (target.closest('.notes-subtask-btn')) {
+                         const subtaskDoc = await getDoc(subtaskRef);
+                         if (subtaskDoc.exists()) {
+                            const path = `users/${currentUserId}/tasks/${subtaskParentId}/subtasks/${subtaskId}`;
+                            showNotesModal(path, `Anotações para "${subtaskDoc.data().text}"`);
+                         }
+                    } else if (target.classList.contains('subtask-checkbox')) {
+                        const isCompleted = target.checked;
+                        const updateData = { completed: isCompleted, completionDate: isCompleted ? new Date().toISOString().split('T')[0] : null };
+                        await updateDoc(subtaskRef, updateData);
+                    } else if(target.closest('.delete-subtask-btn')) {
+                        await deleteDoc(subtaskRef);
+                    } else if(target.closest('.edit-subtask-btn')) {
+                        const subtaskDoc = await getDoc(subtaskRef);
+                        if (subtaskDoc.exists()) {
+                            showEditSubtaskModal({id: subtaskDoc.id, ...subtaskDoc.data()}, subtaskParentId);
+                        }
+                    }
+                    return;
+                }
+
                 if (target.classList.contains('task-checkbox')) {
                     await updateDoc(doc(db, 'users', currentUserId, 'tasks', taskId), { completed: target.checked });
                 } else if (target.closest('.delete-task-btn')) {
@@ -778,6 +842,7 @@
                      await batch.commit();
                     await deleteDoc(doc(db, 'users', currentUserId, 'tasks', taskId));
                 } else if (target.closest('.edit-task-btn')) {
+                    const task = tasks.find(t => t.id === taskId);
                     showEditModal(task);
                 } else if (target.closest('.add-subtask-btn')) {
                     const form = taskItem.querySelector('.add-subtask-form');
@@ -800,27 +865,10 @@
                     const text = textInput.value.trim();
                     const startDate = dateInput.value;
                     if (text && startDate) {
-                        const newSubtask = { text, startDate, completed: false, completionDate: null, createdAt: new Date() };
+                        const newSubtask = { text, startDate, completed: false, completionDate: null, createdAt: new Date(), notes: "" };
                         await addDoc(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'), newSubtask);
                         form.reset();
                         form.classList.add('hidden');
-                    }
-                }
-                const subtaskItem = target.closest('.subtask-item');
-                if (subtaskItem) {
-                    const subtaskId = subtaskItem.dataset.id;
-                    const subtaskRef = doc(db, 'users', currentUserId, 'tasks', taskId, 'subtasks', subtaskId);
-                    if (target.classList.contains('subtask-checkbox')) {
-                        const isCompleted = target.checked;
-                        const updateData = { completed: isCompleted, completionDate: isCompleted ? new Date().toISOString().split('T')[0] : null };
-                        await updateDoc(subtaskRef, updateData);
-                    } else if(target.closest('.delete-subtask-btn')) {
-                        await deleteDoc(subtaskRef);
-                    } else if(target.closest('.edit-subtask-btn')) {
-                        const subtaskDoc = await getDoc(subtaskRef);
-                        if (subtaskDoc.exists()) {
-                            showEditSubtaskModal({id: subtaskDoc.id, ...subtaskDoc.data()}, taskId);
-                        }
                     }
                 }
             };
@@ -828,40 +876,18 @@
             // --- Notifications & Sound ---
             function playNotificationSound() {
                 if (!audioCtx) return;
-                const gainNode = audioCtx.createGain();
-                gainNode.connect(audioCtx.destination);
-                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-
-                const oscillator = audioCtx.createOscillator();
-                oscillator.connect(gainNode);
-                oscillator.type = 'sine';
-
-                const now = audioCtx.currentTime;
-                const tempo = 0.15;
-
-                oscillator.frequency.setValueAtTime(523.25, now);
-                oscillator.frequency.setValueAtTime(659.25, now + tempo * 1);
-                oscillator.frequency.setValueAtTime(783.99, now + tempo * 2);
-                oscillator.frequency.setValueAtTime(1046.50, now + tempo * 3);
-                oscillator.frequency.setValueAtTime(783.99, now + tempo * 5);
-
+                const gainNode = audioCtx.createGain(); gainNode.connect(audioCtx.destination); gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                const oscillator = audioCtx.createOscillator(); oscillator.connect(gainNode); oscillator.type = 'sine';
+                const now = audioCtx.currentTime; const tempo = 0.15;
+                oscillator.frequency.setValueAtTime(523.25, now); oscillator.frequency.setValueAtTime(659.25, now + tempo * 1); oscillator.frequency.setValueAtTime(783.99, now + tempo * 2); oscillator.frequency.setValueAtTime(1046.50, now + tempo * 3); oscillator.frequency.setValueAtTime(783.99, now + tempo * 5);
                 gainNode.gain.exponentialRampToValueAtTime(0.00001, now + tempo * 7);
-
-                oscillator.start(now);
-                oscillator.stop(now + tempo * 7);
+                oscillator.start(now); oscillator.stop(now + tempo * 7);
             }
-
             const notifyUser = (task) => {
                 showModal('info', 'Lembrete de Tarefa!', `Sua tarefa "${task.text}" está próxima do vencimento.`);
                 playNotificationSound();
-                if (Notification.permission === 'granted') {
-                    new Notification('Lembrete de Tarefa!', {
-                        body: `Sua tarefa "${task.text}" está próxima do vencimento.`,
-                        icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>'
-                    });
-                }
+                if (Notification.permission === 'granted') { new Notification('Lembrete de Tarefa!', { body: `Sua tarefa "${task.text}" está próxima do vencimento.`, icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>'}); }
             };
-
             const checkReminders = () => {
                 if (!currentUserId) return;
                 const now = new Date();
@@ -869,10 +895,7 @@
                     if (task.reminder && !task.completed && !notifiedTasks.has(task.id)) {
                         const taskTime = new Date(task.datetime);
                         const diffMinutes = (taskTime - now) / (1000 * 60);
-                        if (diffMinutes > 0 && diffMinutes <= 5) {
-                            notifyUser(task);
-                            notifiedTasks.add(task.id);
-                        }
+                        if (diffMinutes > 0 && diffMinutes <= 5) { notifyUser(task); notifiedTasks.add(task.id); }
                     }
                 });
             };
@@ -893,6 +916,8 @@
             apiKeyForm.addEventListener('submit', saveApiKey);
             geminiDecomposeBtn.addEventListener('click', handleGeminiDecompose);
             taskInput.addEventListener('input', () => { if (geminiApiKey) { geminiDecomposeBtn.disabled = !taskInput.value.trim(); } });
+            notesForm.addEventListener('submit', handleSaveNotes);
+            notesModalCloseBtn.addEventListener('click', () => hideGenericModal(notesModal));
             
             // --- App Initialization ---
             const now = new Date();
