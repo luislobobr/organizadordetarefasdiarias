@@ -55,15 +55,16 @@
             border-top-color: #fff;
             animation: spin 1s linear infinite;
         }
+        /* Auth UI visibility control */
         .auth-ui-element {
             display: none;
         }
         .auth-ui-element.visible {
             display: flex;
         }
-        .main-content.logged-out {
-            opacity: 0.5;
-            pointer-events: none;
+        .main-content.logged-out .content-wrapper {
+             opacity: 0.2;
+             pointer-events: none;
         }
     </style>
 </head>
@@ -98,102 +99,104 @@
                 </button>
             </header>
 
-            <main id="main-content" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div id="main-content" class="relative">
+                <div id="logged-out-state" class="absolute inset-0 flex-col items-center justify-center text-center py-12 z-10 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/><path d="M21 12c-1.65-3.33-5.02-6-9-6s-7.35 2.67-9 6c1.65 3.33 5.02 6 9 6s7.35-2.67 9 6Z"/><path d="M2 12h20"/></svg>
+                    <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Bem-vindo(a)!</h3>
+                    <p class="mt-1 text-slate-500 dark:text-slate-400">Faça login com sua conta Google para ver e gerenciar suas tarefas.</p>
+                </div>
 
-                <!-- Coluna da Esquerda: Adicionar Tarefa -->
-                <aside class="lg:col-span-1">
-                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg sticky top-8 transition-colors duration-300">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-2xl font-semibold flex items-center dark:text-slate-200">
-                                <i data-lucide="plus-circle" class="mr-2"></i>
-                                Nova Tarefa
-                            </h2>
-                            <button id="api-key-btn" class="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-100 dark:hover:bg-slate-700 transition">
-                                <i data-lucide="key-round" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-
-                        <form id="task-form" class="space-y-4">
-                            <div>
-                                <label for="task-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
-                                <input type="text" id="task-input" placeholder="Ex: Organizar festa de aniversário" required
-                                       class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 dark:placeholder-slate-400 transition-colors duration-300">
-                            </div>
-                            <div>
-                                <label for="task-datetime" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data e Hora de Entrega</label>
-                                <input type="datetime-local" id="task-datetime" required
-                                       class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 [color-scheme:dark] transition-colors duration-300">
-                            </div>
-                            <div>
-                                <label for="task-category" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-                                <select id="task-category" class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white dark:bg-slate-700 dark:text-slate-200">
-                                    <option value="trabalho">Trabalho</option>
-                                    <option value="reuniao">Reunião</option>
-                                    <option value="projeto">Projeto</option>
-                                    <option value="pessoal">Pessoal</option>
-                                </select>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="task-reminder" class="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-700">
-                                <label for="task-reminder" class="ml-2 block text-sm text-slate-900 dark:text-slate-200">Ativar lembrete?</label>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition transform hover:scale-105 flex items-center justify-center">
-                                    Adicionar
-                                </button>
-                                <button type="button" id="gemini-decompose-btn" class="w-full bg-purple-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition transform hover:scale-105 flex items-center justify-center gemini-btn" disabled>
-                                    <span class="gemini-btn-text">✨ Decompor</span>
-                                    <div class="loader w-4 h-4 border-2 border-t-transparent rounded-full ml-2 hidden"></div>
+                <main class="grid grid-cols-1 lg:grid-cols-3 gap-8 content-wrapper">
+                    <!-- Coluna da Esquerda: Adicionar Tarefa -->
+                    <aside class="lg:col-span-1">
+                        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg sticky top-8 transition-colors duration-300">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-semibold flex items-center dark:text-slate-200">
+                                    <i data-lucide="plus-circle" class="mr-2"></i>
+                                    Nova Tarefa
+                                </h2>
+                                <button id="api-key-btn" class="p-2 text-slate-400 hover:text-indigo-600 rounded-full hover:bg-indigo-100 dark:hover:bg-slate-700 transition">
+                                    <i data-lucide="key-round" class="w-5 h-5"></i>
                                 </button>
                             </div>
-                        </form>
-                    </div>
-                </aside>
 
-                <!-- Coluna da Direita: Lista de Tarefas -->
-                <section class="lg:col-span-2">
-                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg transition-colors duration-300">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-200 dark:border-slate-700 pb-4">
-                            <h2 class="text-2xl font-semibold mb-4 sm:mb-0 dark:text-slate-200">Minhas Tarefas</h2>
-                             <div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-sm font-medium">Filtrar:</span>
-                                    <select id="filter-category" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition text-sm bg-white dark:bg-slate-700 dark:text-slate-200">
-                                        <option value="all">Todas</option>
+                            <form id="task-form" class="space-y-4">
+                                <div>
+                                    <label for="task-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
+                                    <input type="text" id="task-input" placeholder="Ex: Organizar festa de aniversário" required
+                                           class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 dark:placeholder-slate-400 transition-colors duration-300">
+                                </div>
+                                <div>
+                                    <label for="task-datetime" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data e Hora de Entrega</label>
+                                    <input type="datetime-local" id="task-datetime" required
+                                           class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200 [color-scheme:dark] transition-colors duration-300">
+                                </div>
+                                <div>
+                                    <label for="task-category" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                                    <select id="task-category" class="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white dark:bg-slate-700 dark:text-slate-200">
                                         <option value="trabalho">Trabalho</option>
                                         <option value="reuniao">Reunião</option>
                                         <option value="projeto">Projeto</option>
                                         <option value="pessoal">Pessoal</option>
-                                        <option value="concluidas">Concluídas</option>
-                                        <option value="pendentes">Pendentes</option>
                                     </select>
                                 </div>
-                                <div class="flex items-center space-x-4 mt-3 text-xs text-slate-500 dark:text-slate-400">
-                                    <span>Legenda:</span>
-                                    <span class="flex items-center"><span class="w-3 h-3 block rounded-full bg-yellow-400 mr-1.5 border border-slate-300 dark:border-slate-500"></span>Vence Hoje</span>
-                                    <span class="flex items-center"><span class="w-3 h-3 block rounded-full bg-red-400 mr-1.5 border border-slate-300 dark:border-slate-500"></span>Atrasada</span>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="task-reminder" class="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-700">
+                                    <label for="task-reminder" class="ml-2 block text-sm text-slate-900 dark:text-slate-200">Ativar lembrete?</label>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition transform hover:scale-105 flex items-center justify-center">
+                                        Adicionar
+                                    </button>
+                                    <button type="button" id="gemini-decompose-btn" class="w-full bg-purple-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition transform hover:scale-105 flex items-center justify-center gemini-btn" disabled>
+                                        <span class="gemini-btn-text">✨ Decompor</span>
+                                        <div class="loader w-4 h-4 border-2 border-t-transparent rounded-full ml-2 hidden"></div>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </aside>
+
+                    <!-- Coluna da Direita: Lista de Tarefas -->
+                    <section class="lg:col-span-2">
+                        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg transition-colors duration-300">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-200 dark:border-slate-700 pb-4">
+                                <h2 class="text-2xl font-semibold mb-4 sm:mb-0 dark:text-slate-200">Minhas Tarefas</h2>
+                                 <div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-sm font-medium">Filtrar:</span>
+                                        <select id="filter-category" class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition text-sm bg-white dark:bg-slate-700 dark:text-slate-200">
+                                            <option value="all">Todas</option>
+                                            <option value="trabalho">Trabalho</option>
+                                            <option value="reuniao">Reunião</option>
+                                            <option value="projeto">Projeto</option>
+                                            <option value="pessoal">Pessoal</option>
+                                            <option value="concluidas">Concluídas</option>
+                                            <option value="pendentes">Pendentes</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center space-x-4 mt-3 text-xs text-slate-500 dark:text-slate-400">
+                                        <span>Legenda:</span>
+                                        <span class="flex items-center"><span class="w-3 h-3 block rounded-full bg-yellow-400 mr-1.5 border border-slate-300 dark:border-slate-500"></span>Vence Hoje</span>
+                                        <span class="flex items-center"><span class="w-3 h-3 block rounded-full bg-red-400 mr-1.5 border border-slate-300 dark:border-slate-500"></span>Atrasada</span>
+                                    </div>
                                 </div>
                             </div>
+                            
+                            <ul id="task-list" class="space-y-4">
+                                 <div id="empty-state" class="text-center py-12 hidden">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Z"/><path d="M15 2v20"/><path d="M8 7h4"/><path d="M8 12h4"/><path d="M8 17h4"/></svg>
+                                    <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Nenhuma tarefa por aqui!</h3>
+                                    <p class="mt-1 text-slate-500 dark:text-slate-400">Adicione uma nova tarefa para começar a se organizar.</p>
+                                </div>
+                                <div id="loading-state" class="text-center py-12 hidden">
+                                    <p class="text-slate-500 dark:text-slate-400">Carregando tarefas...</p>
+                                </div>
+                            </ul>
                         </div>
-                        
-                        <ul id="task-list" class="space-y-4">
-                             <div id="logged-out-state" class="text-center py-12">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M10 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/><path d="M21 12c-1.65-3.33-5.02-6-9-6s-7.35 2.67-9 6c1.65 3.33 5.02 6 9 6s7.35-2.67 9 6Z"/><path d="M2 12h20"/></svg>
-                                <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Bem-vindo(a)!</h3>
-                                <p class="mt-1 text-slate-500 dark:text-slate-400">Faça login com sua conta Google para ver e gerenciar suas tarefas.</p>
-                            </div>
-                             <div id="empty-state" class="text-center py-12 hidden">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 dark:text-slate-500"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Z"/><path d="M15 2v20"/><path d="M8 7h4"/><path d="M8 12h4"/><path d="M8 17h4"/></svg>
-                                <h3 class="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">Nenhuma tarefa por aqui!</h3>
-                                <p class="mt-1 text-slate-500 dark:text-slate-400">Adicione uma nova tarefa para começar a se organizar.</p>
-                            </div>
-                            <div id="loading-state" class="text-center py-12 hidden">
-                                <p class="text-slate-500 dark:text-slate-400">Carregando tarefas...</p>
-                            </div>
-                        </ul>
-                    </div>
-                </section>
-            </main>
+                    </section>
+                </main>
+            </div>
         </div>
     </div>
     
@@ -351,8 +354,8 @@
             // --- App State ---
             let currentUserId = null;
             let tasks = [];
-            let unsubscribeMain = () => {};
-            let unsubscribeSubtasks = {};
+            let unsubscribeMainTasks = () => {};
+            let subtaskListeners = {};
             let notifiedTasks = new Set();
             let audioCtx;
             let geminiApiKey = sessionStorage.getItem('geminiApiKey') || null;
@@ -364,7 +367,43 @@
                 pessoal: { label: 'Pessoal', color: 'bg-yellow-100 dark:bg-yellow-900/50', textColor: 'text-yellow-800 dark:text-yellow-300', icon: 'user' }
             };
 
-            // --- Authentication ---
+            // --- Authentication & UI State Management ---
+            const updateUIForAuthState = (user) => {
+                if (user) {
+                    mainContent.classList.remove('logged-out');
+                    loggedOutState.classList.add('hidden');
+                    loginBtn.classList.remove('visible');
+                    userInfo.classList.add('visible');
+                    userName.textContent = user.displayName;
+                    userAvatar.src = user.photoURL;
+                } else {
+                    mainContent.classList.add('logged-out');
+                    loggedOutState.classList.remove('hidden');
+                    loginBtn.classList.add('visible');
+                    userInfo.classList.remove('visible');
+                    taskList.innerHTML = '';
+                    emptyState.classList.add('hidden');
+                    loadingState.classList.add('hidden');
+                }
+            };
+            
+            onAuthStateChanged(auth, (user) => {
+                // Clear previous user's data and listeners first
+                unsubscribeMainTasks();
+                Object.values(subtaskListeners).forEach(unsub => unsub());
+                subtaskListeners = {};
+                tasks = [];
+                taskList.innerHTML = '';
+
+                if (user) {
+                    currentUserId = user.uid;
+                    loadTasks(currentUserId);
+                } else {
+                    currentUserId = null;
+                }
+                updateUIForAuthState(user);
+            });
+
             const signInWithGoogle = async () => {
                 const provider = new GoogleAuthProvider();
                 try {
@@ -373,74 +412,31 @@
                     console.error("Erro no login com Google:", error);
                     if (error.code === 'auth/unauthorized-domain') {
                         const currentOrigin = window.location.origin;
-                        const detailedMessage = `O domínio "${currentOrigin}" não está autorizado. Vá ao seu Console do Firebase > Authentication > Settings > Domínios autorizados e adicione ESTE domínio e também "usercontent.goog" à lista.`;
-                        showModal(
-                            'error', 
-                            'Domínio Não Autorizado', 
-                            detailedMessage
-                        );
+                        const detailedMessage = `O domínio "${currentOrigin}" não está autorizado. Vá ao seu Console do Firebase > Authentication > Settings > Domínios autorizados e adicione ESTE domínio à lista.`;
+                        showModal('error', 'Domínio Não Autorizado', detailedMessage);
                     } else {
                         showModal('error', 'Falha no Login', `Não foi possível autenticar. Erro: ${error.message}`);
                     }
                 }
             };
 
-            const logoutUser = async () => {
-                try {
-                    await signOut(auth);
-                } catch (error) {
-                    console.error("Erro ao sair:", error);
-                }
-            };
-            
-            const cleanupListeners = () => {
-                unsubscribeMain();
-                Object.values(unsubscribeSubtasks).forEach(unsub => unsub());
-                unsubscribeSubtasks = {};
-            };
+            const logoutUser = () => signOut(auth).catch(error => console.error("Erro ao sair:", error));
 
-            onAuthStateChanged(auth, (user) => {
-                cleanupListeners(); // Always cleanup previous listeners first!
+            function loadTasks(userId) {
+                loadingState.classList.remove('hidden');
+                emptyState.classList.add('hidden');
 
-                if (user) { // User is signed in
-                    currentUserId = user.uid;
-                    userName.textContent = user.displayName;
-                    userAvatar.src = user.photoURL;
-                    
-                    // Setup UI for logged-in state
-                    loginBtn.classList.remove('visible');
-                    userInfo.classList.add('visible');
-                    mainContent.classList.remove('logged-out');
-                    loggedOutState.classList.add('hidden');
-                    loadingState.classList.remove('hidden');
-
-                    // Subscribe to tasks
-                    const q = query(collection(db, 'users', user.uid, 'tasks'), orderBy('datetime'));
-                    unsubscribeMain = onSnapshot(q, snapshot => {
-                        loadingState.classList.add('hidden');
-                        tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        renderTasks();
-                    }, error => {
-                        console.error("Error loading tasks: ", error);
-                        loadingState.classList.add('hidden');
-                        showModal('error', 'Erro de Conexão', 'Não foi possível carregar as tarefas. Verifique as regras de segurança do seu Firestore.');
-                    });
-
-                } else { // User is signed out
-                    currentUserId = null;
-                    tasks = [];
-                    
-                    // Setup UI for logged-out state
-                    loginBtn.classList.add('visible');
-                    userInfo.classList.remove('visible');
-                    mainContent.classList.add('logged-out');
-                    
-                    taskList.innerHTML = ''; // Clear visual list
-                    loggedOutState.classList.remove('hidden');
-                    emptyState.classList.add('hidden');
+                const q = query(collection(db, 'users', userId, 'tasks'), orderBy('datetime'));
+                unsubscribeMainTasks = onSnapshot(q, snapshot => {
                     loadingState.classList.add('hidden');
-                }
-            });
+                    tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderTasks();
+                }, error => {
+                    console.error("Error loading tasks: ", error);
+                    loadingState.classList.add('hidden');
+                    showModal('error', 'Erro de Conexão', 'Não foi possível carregar as tarefas. Verifique as regras de segurança do seu Firestore.');
+                });
+            }
             
             // --- Theme Management ---
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -453,18 +449,15 @@
                 localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
             });
             
-            // --- UI Functions (Modals, Rendering, etc.) ---
-            
+            // --- Modals ---
             function showGenericModal(modalElement) {
                 modalElement.classList.remove('hidden');
                 setTimeout(() => {
-                    const content = modalElement.querySelector('div');
-                    if (content) content.classList.add('scale-100', 'opacity-100');
+                    modalElement.querySelector('div').classList.add('scale-100', 'opacity-100');
                 }, 10);
             }
             function hideGenericModal(modalElement) {
-                 const content = modalElement.querySelector('div');
-                 if (content) content.classList.remove('scale-100', 'opacity-100');
+                 modalElement.querySelector('div').classList.remove('scale-100', 'opacity-100');
                 setTimeout(() => modalElement.classList.add('hidden'), 200);
             }
              function showModal(type, title, message) {
@@ -493,6 +486,7 @@
             }
             function hideEditSubtaskModal() { hideGenericModal(editSubtaskModal); }
 
+            // --- Gemini API ---
             const toggleGeminiLoading = (isLoading) => {
                 const btnText = geminiDecomposeBtn.querySelector('.gemini-btn-text');
                 const loader = geminiDecomposeBtn.querySelector('.loader');
@@ -605,6 +599,8 @@
                     showModal('success', 'Chave Salva!', 'Sua chave de API do Gemini foi salva para esta sessão.');
                 }
             };
+
+            // --- Task Rendering & Management ---
             const renderTasks = () => {
                 taskList.innerHTML = '';
                 
@@ -627,6 +623,7 @@
                 }
                 lucide.createIcons();
             };
+
             const createTaskElement = (task) => {
                 const li = document.createElement('li');
                 li.className = `task-item bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 transition-colors duration-300 border-l-4 ${task.completed ? 'border-slate-300 dark:border-slate-600' : 'border-indigo-500 dark:border-indigo-400'}`;
@@ -680,30 +677,29 @@
                 `;
                 const subtaskContainer = li.querySelector('.subtask-list');
                 const counterElement = li.querySelector('.subtask-counter');
-                
-                // Unsubscribe from old listener if it exists before creating a new one
-                const oldUnsubscribe = unsubscribeSubtasks[task.id];
-                if (oldUnsubscribe) {
-                    oldUnsubscribe();
-                }
-                
-                const subtaskCollectionRef = collection(db, 'users', currentUserId, 'tasks', task.id, 'subtasks');
-                const q = query(subtaskCollectionRef, orderBy('createdAt'));
-                
-                unsubscribeSubtasks[task.id] = onSnapshot(q, (snapshot) => {
-                    subtaskContainer.innerHTML = '';
-                    const subtasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    const completedCount = subtasks.filter(st => st.completed).length;
-                    if(counterElement) counterElement.textContent = `${completedCount}/${subtasks.length} concluídas`;
-                    const expandBtn = li.querySelector('.expand-subtasks-btn');
-                    if (subtasks.length > 0) expandBtn.classList.remove('hidden'); else expandBtn.classList.add('hidden');
-                    subtasks.forEach(subtask => subtaskContainer.appendChild(createSubtaskElement(subtask)));
-                    lucide.createIcons();
-                });
-
+                loadAndRenderSubtasks(task.id, subtaskContainer, counterElement);
                 return li;
             };
-           
+            function loadAndRenderSubtasks(taskId, container, counterElement) {
+                const subtaskCollectionRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
+                const q = query(subtaskCollectionRef, orderBy('createdAt'));
+                
+                if(subtaskListeners[taskId]) subtaskListeners[taskId](); // Unsubscribe from previous listener for this task
+                
+                subtaskListeners[taskId] = onSnapshot(q, (snapshot) => {
+                    container.innerHTML = '';
+                    const subtasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const completedCount = subtasks.filter(st => st.completed).length;
+                    
+                    if(counterElement) counterElement.textContent = subtasks.length > 0 ? `${completedCount}/${subtasks.length} concluídas` : '';
+                    
+                    const expandBtn = container.closest('.task-item').querySelector('.expand-subtasks-btn');
+                    if (subtasks.length > 0) expandBtn.classList.remove('hidden'); else expandBtn.classList.add('hidden');
+                    
+                    subtasks.forEach(subtask => container.appendChild(createSubtaskElement(subtask)));
+                    lucide.createIcons();
+                });
+            }
             const createSubtaskElement = (subtask) => {
                 const li = document.createElement('li');
                 li.className = 'subtask-item flex items-center justify-between bg-white dark:bg-slate-700 p-2.5 rounded-lg border border-slate-200 dark:border-slate-600';
@@ -730,8 +726,6 @@
                 `;
                 return li;
             };
-
-            // --- Data Manipulation Functions ---
             const addTask = async (e) => {
                 e.preventDefault();
                 if (!currentUserId) {
@@ -795,9 +789,8 @@
                     const expandBtn = target.closest('.expand-subtasks-btn');
                     const subtaskList = taskItem.querySelector('.subtask-list');
                     subtaskList.classList.toggle('expanded');
-                    const iconEl = expandBtn.querySelector('i');
                     const iconName = subtaskList.classList.contains('expanded') ? 'chevron-up' : 'chevron-down';
-                    if (iconEl) iconEl.setAttribute('data-lucide', iconName);
+                    expandBtn.innerHTML = `<i data-lucide="${iconName}" class="w-5 h-5"></i>`;
                     lucide.createIcons();
                 } else if (target.closest('.add-subtask-form')) {
                     e.preventDefault();
@@ -832,7 +825,7 @@
                 }
             };
             
-            // --- Notification Functions ---
+            // --- Notifications & Sound ---
             function playNotificationSound() {
                 if (!audioCtx) return;
                 const gainNode = audioCtx.createGain();
@@ -846,7 +839,7 @@
                 const now = audioCtx.currentTime;
                 const tempo = 0.15;
 
-                oscillator.frequency.setValueAtTime(523.25, now); 
+                oscillator.frequency.setValueAtTime(523.25, now);
                 oscillator.frequency.setValueAtTime(659.25, now + tempo * 1);
                 oscillator.frequency.setValueAtTime(783.99, now + tempo * 2);
                 oscillator.frequency.setValueAtTime(1046.50, now + tempo * 3);
@@ -884,7 +877,7 @@
                 });
             };
 
-            // --- Initial Setup & Event Listeners ---
+            // --- Event Listeners ---
             loginBtn.addEventListener('click', signInWithGoogle);
             logoutBtn.addEventListener('click', logoutUser);
             taskForm.addEventListener('submit', addTask);
@@ -901,6 +894,7 @@
             geminiDecomposeBtn.addEventListener('click', handleGeminiDecompose);
             taskInput.addEventListener('input', () => { if (geminiApiKey) { geminiDecomposeBtn.disabled = !taskInput.value.trim(); } });
             
+            // --- App Initialization ---
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             taskDatetime.min = now.toISOString().slice(0,16);
