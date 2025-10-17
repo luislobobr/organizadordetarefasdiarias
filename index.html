@@ -211,7 +211,7 @@
                 </main>
             </div>
              <footer class="text-center mt-auto pt-12 text-xs text-secondary">
-                <p>Organizador de Tarefas PRO v8.1</p>
+                <p>Organizador de Tarefas PRO v8.2</p>
                 <p>Criado por Você & Gemini</p>
             </footer>
         </div>
@@ -334,6 +334,9 @@
             const logoutUser = () => signOut(auth).catch(error => console.error("Logout error", error));
             
             onAuthStateChanged(auth, (user) => {
+                const isKeyValid = geminiApiKey && geminiApiKey !== 'SUA_CHAVE_API_AQUI';
+                [geminiDecomposeBtn, naturalSubmit, suggestTaskBtn].forEach(btn => btn.disabled = !isKeyValid);
+                
                 if (user) {
                     currentUserId = user.uid;
                     mainContent.classList.remove('logged-out');
@@ -362,20 +365,12 @@
 
             // --- Gemini AI ---
             async function callGeminiAPI(payload) {
-                 if (!geminiApiKey) {
-                    alert('A chave de API do Gemini não está configurada.');
-                    return null;
-                }
+                if (!geminiApiKey) { alert('A chave de API do Gemini não está configurada.'); return null; }
                 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
-                let retries = 3;
-                let delay = 1000;
+                let retries = 3, delay = 1000;
                 while (retries > 0) {
                     try {
-                        const response = await fetch(API_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
+                        const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         if (!response.ok) {
                             if (response.status === 429 || response.status === 503) throw new Error("Model overloaded");
                             const errorBody = await response.json();
@@ -387,11 +382,7 @@
                         return JSON.parse(text.replace(/```json|```/g, '').trim());
                     } catch (error) {
                         retries--;
-                        if (retries === 0) {
-                            console.error("Falha na chamada da API Gemini:", error);
-                            alert(`Erro ao comunicar com a IA: ${error.message}`);
-                            return null;
-                        }
+                        if (retries === 0) { console.error("Falha na chamada da API Gemini:", error); alert(`Erro ao comunicar com a IA: ${error.message}`); return null; }
                         await new Promise(resolve => setTimeout(resolve, delay));
                         delay *= 2;
                     }
@@ -401,6 +392,7 @@
             const handleNaturalSubmit = async () => {
                 const text = naturalInput.value.trim();
                 if (!text) return;
+                naturalSubmit.disabled = true;
                 const payload = {
                     contents: [{ parts: [{ text: `Analise o texto e extraia o título da tarefa e a data e hora. A data e hora atual é ${new Date().toISOString()}. Retorne um JSON com "title" e "datetime" (formato YYYY-MM-DDTHH:mm). Texto: "${text}"` }] }],
                     generationConfig: { responseMimeType: "application/json" }
@@ -411,6 +403,7 @@
                     taskDatetime.value = result.datetime || '';
                     naturalInput.value = '';
                 }
+                naturalSubmit.disabled = false;
             };
             naturalSubmit.addEventListener('click', handleNaturalSubmit);
             
@@ -430,21 +423,14 @@
                 e.preventDefault();
                 if (!currentUserId || !taskInput.value.trim() || !taskDatetime.value) return;
                 const newTask = {
-                    text: taskInput.value.trim(),
-                    datetime: Timestamp.fromDate(new Date(taskDatetime.value)),
-                    category: taskCategory.value,
-                    completed: false,
-                    notes: "",
-                    order: tasks.length,
-                    createdAt: serverTimestamp(),
-                    userId: currentUserId
+                    text: taskInput.value.trim(), datetime: Timestamp.fromDate(new Date(taskDatetime.value)),
+                    category: taskCategory.value, completed: false, notes: "", order: tasks.length,
+                    createdAt: serverTimestamp(), userId: currentUserId
                 };
                 try {
                     await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
                     taskForm.reset();
-                } catch (error) {
-                    console.error("Error adding task:", error);
-                }
+                } catch (error) { console.error("Error adding task:", error); }
             };
             taskForm.addEventListener('submit', addTask);
 
@@ -466,7 +452,6 @@
                 li.className = 'task-item bg-tertiary p-4 rounded-lg shadow-sm';
                 li.dataset.id = task.id;
                 const datetime = task.datetime.toDate ? task.datetime.toDate().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Data inválida';
-
                 li.innerHTML = `
                     <div class="flex items-start justify-between">
                         <div class="flex items-start">
@@ -492,20 +477,93 @@
                 loadAndRenderSubtasks(task.id, li);
                 return li;
             }
-             function loadAndRenderSubtasks(taskId, taskElement) { /* ... */ }
-             function createSubtaskElement(subtask, parentId) { /* ... */ }
+
+            function loadAndRenderSubtasks(taskId, taskElement) {
+                const subtaskList = taskElement.querySelector('.subtask-list');
+                const progressBarContainer = taskElement.querySelector('.progress-bar');
+                const progressBarFill = taskElement.querySelector('.progress-bar-fill');
+                const expandBtn = taskElement.querySelector('.expand-subtasks-btn');
+                const subtasksRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
+                const q = query(subtasksRef, orderBy('createdAt', 'asc'));
+
+                if (subtasksListeners[taskId]) subtasksListeners[taskId]();
+                subtasksListeners[taskId] = onSnapshot(q, snapshot => {
+                    subtaskList.innerHTML = '';
+                    const subtasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    if (subtasks.length > 0) {
+                        expandBtn.classList.remove('hidden');
+                        progressBarContainer.classList.remove('hidden');
+                        const completedCount = subtasks.filter(s => s.completed).length;
+                        const progress = (completedCount / subtasks.length) * 100;
+                        progressBarFill.style.width = `${progress}%`;
+                    } else {
+                        expandBtn.classList.add('hidden');
+                        progressBarContainer.classList.add('hidden');
+                    }
+                    subtasks.forEach(subtask => subtaskList.appendChild(createSubtaskElement(subtask, taskId)));
+                    lucide.createIcons();
+                });
+            }
+
+            function createSubtaskElement(subtask, parentId) {
+                const li = document.createElement('li');
+                li.className = 'subtask-item flex items-center justify-between bg-secondary p-2 rounded-md';
+                li.dataset.id = subtask.id;
+                li.dataset.parentId = parentId;
+                li.innerHTML = `
+                    <div class="flex items-center">
+                        <input type="checkbox" class="subtask-checkbox h-4 w-4 rounded border-color text-accent focus:ring-accent" ${subtask.completed ? 'checked' : ''}>
+                        <p class="ml-2 text-sm text-primary ${subtask.completed ? 'completed' : ''}">${subtask.text}</p>
+                    </div>
+                    <div class="flex items-center">
+                         <button class="notes-subtask-btn p-1 text-secondary hover:text-yellow-500 transition ${subtask.notes ? 'text-yellow-500' : ''}" title="Anotações"><i data-lucide="notebook-pen" class="w-3 h-3"></i></button>
+                         <button class="delete-subtask-btn p-1 text-secondary hover:text-red-500 transition" title="Apagar Subtarefa"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                    </div>
+                `;
+                return li;
+            }
             
             // --- Event Delegation ---
             taskListEl.addEventListener('click', async (e) => {
-                 const taskItem = e.target.closest('.task-item');
+                const taskItem = e.target.closest('.task-item');
                 if (!taskItem) return;
                 const taskId = taskItem.dataset.id;
                 const task = tasks.find(t => t.id === taskId);
-                
-                if (e.target.closest('.edit-task-btn')) {
+                if (e.target.closest('.task-checkbox')) {
+                    await updateDoc(doc(db, 'users', currentUserId, 'tasks', taskId), { completed: e.target.closest('.task-checkbox').checked });
+                } else if (e.target.closest('.delete-task-btn')) {
+                    const subtasksSnapshot = await getDocs(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'));
+                    const batch = writeBatch(db);
+                    subtasksSnapshot.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                    await deleteDoc(doc(db, 'users', currentUserId, 'tasks', taskId));
+                } else if (e.target.closest('.edit-task-btn')) {
                     openEditTaskModal(task);
+                } else if (e.target.closest('.notes-task-btn')) {
+                    openNotesModal(taskId, 'task', task.notes || "");
+                } else if (e.target.closest('.expand-subtasks-btn')) {
+                    taskItem.querySelector('.subtask-list').classList.toggle('expanded');
+                } else if (e.target.closest('.add-subtask-btn')) {
+                    const newSubtaskText = prompt("Nova subtarefa:");
+                    if (newSubtaskText) {
+                         await addDoc(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'), {
+                            text: newSubtaskText, completed: false, notes: "", createdAt: serverTimestamp()
+                        });
+                    }
                 }
-                //... rest of the handlers
+                const subtaskItem = e.target.closest('.subtask-item');
+                if (subtaskItem) {
+                    const subtaskId = subtaskItem.dataset.id, parentId = subtaskItem.dataset.parentId;
+                    const subtaskRef = doc(db, 'users', currentUserId, 'tasks', parentId, 'subtasks', subtaskId);
+                    if (e.target.closest('.subtask-checkbox')) {
+                        await updateDoc(subtaskRef, { completed: e.target.closest('.subtask-checkbox').checked });
+                    } else if (e.target.closest('.delete-subtask-btn')) {
+                        await deleteDoc(subtaskRef);
+                    } else if (e.target.closest('.notes-subtask-btn')) {
+                        const subtaskDoc = await getDoc(subtaskRef);
+                        openNotesModal(subtaskId, 'subtask', subtaskDoc.data().notes || "", parentId);
+                    }
+                }
             });
             
             // --- Modals ---
@@ -513,33 +571,53 @@
                 editTaskId.value = task.id;
                 editTaskInput.value = task.text;
                 const taskDate = task.datetime.toDate();
-                const yyyy = taskDate.getFullYear();
-                const mm = String(taskDate.getMonth() + 1).padStart(2, '0');
-                const dd = String(taskDate.getDate()).padStart(2, '0');
-                const hh = String(taskDate.getHours()).padStart(2, '0');
-                const min = String(taskDate.getMinutes()).padStart(2, '0');
-                editTaskDatetime.value = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+                editTaskDatetime.value = `${taskDate.getFullYear()}-${String(taskDate.getMonth() + 1).padStart(2, '0')}-${String(taskDate.getDate()).padStart(2, '0')}T${String(taskDate.getHours()).padStart(2, '0')}:${String(taskDate.getMinutes()).padStart(2, '0')}`;
                 editTaskCategory.value = task.category;
                 editTaskModal.classList.remove('hidden');
             }
             editTaskModalCloseBtn.addEventListener('click', () => editTaskModal.classList.add('hidden'));
             editTaskForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const id = editTaskId.value;
                 const updatedData = {
-                    text: editTaskInput.value,
-                    datetime: Timestamp.fromDate(new Date(editTaskDatetime.value)),
+                    text: editTaskInput.value, datetime: Timestamp.fromDate(new Date(editTaskDatetime.value)),
                     category: editTaskCategory.value
                 };
-                await updateDoc(doc(db, 'users', currentUserId, 'tasks', id), updatedData);
+                await updateDoc(doc(db, 'users', currentUserId, 'tasks', editTaskId.value), updatedData);
                 editTaskModal.classList.add('hidden');
             });
-            // Other modal logic...
+            function openNotesModal(id, type, currentNotes, parentId = null) {
+                notesItemId.value = id; notesItemType.value = type;
+                notesParentId.value = parentId; notesTextarea.value = currentNotes;
+                notesModal.classList.remove('hidden');
+            }
+            notesModalCloseBtn.addEventListener('click', () => notesModal.classList.add('hidden'));
+            notesForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const id = notesItemId.value, type = notesItemType.value, parentId = notesParentId.value, notes = notesTextarea.value;
+                const docRef = type === 'task' ? doc(db, 'users', currentUserId, 'tasks', id) : doc(db, 'users', currentUserId, 'tasks', parentId, 'subtasks', id);
+                await updateDoc(docRef, { notes });
+                notesModal.classList.add('hidden');
+            });
 
             // --- Drag & Drop, Theme etc. ---
-            new Sortable(taskListEl, { animation: 150, ghostClass: 'sortable-ghost', onEnd: async (evt) => { /* ... */ }});
+            new Sortable(taskListEl, { animation: 150, ghostClass: 'sortable-ghost', onEnd: async (evt) => {
+                const movedItem = tasks.splice(evt.oldIndex, 1)[0];
+                tasks.splice(evt.newIndex, 0, movedItem);
+                const batch = writeBatch(db);
+                tasks.forEach((task, index) => {
+                    const taskRef = doc(db, 'users', currentUserId, 'tasks', task.id);
+                    batch.update(taskRef, { order: index });
+                });
+                await batch.commit();
+             }});
             const themeToggle = document.getElementById('theme-toggle');
-            themeToggle.addEventListener('click', () => { /* ... */ });
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+            themeToggle.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            });
             
             lucide.createIcons();
         });
