@@ -213,7 +213,7 @@
             </div>
         </div>
          <footer class="text-center mt-12 text-xs text-secondary">
-            <p>Organizador de Tarefas PRO v7.8</p>
+            <p>Organizador de Tarefas PRO v7.9</p>
             <p>Criado por Você & Gemini</p>
         </footer>
     </div>
@@ -322,31 +322,50 @@
             logoutBtn.addEventListener('click', logoutUser);
 
             // --- Gemini AI ---
-             async function callGeminiAPI(payload) {
+            async function callGeminiAPI(payload) {
                 if (!geminiApiKey || geminiApiKey === 'SUA_CHAVE_API_AQUI') {
                     alert('Por favor, adicione a sua chave de API do Gemini diretamente no código-fonte para testes.');
                     return null;
                 }
-                // CORRECÇÃO: Utilizar o modelo mais recente e recomendado
                 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
-                try {
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) {
-                        const errorBody = await response.json();
-                        throw new Error(`API Error: ${errorBody.error?.message || response.statusText}`);
+
+                let retries = 3;
+                let delay = 1000; // 1 segundo
+
+                while (retries > 0) {
+                    try {
+                        const response = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            // Se o erro for de sobrecarga, lança um erro específico para tentar novamente
+                            if (response.status === 429 || response.status === 503) {
+                                throw new Error("Model overloaded");
+                            }
+                            const errorBody = await response.json();
+                            throw new Error(`API Error: ${errorBody.error?.message || response.statusText}`);
+                        }
+
+                        const result = await response.json();
+                        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (!text) throw new Error('Resposta da API inválida');
+                        
+                        return JSON.parse(text.replace(/```json|```/g, '').trim());
+
+                    } catch (error) {
+                        console.warn(`Falha na chamada da API Gemini, a tentar novamente... (${retries - 1} restantes)`);
+                        retries--;
+                        if (retries === 0) {
+                            console.error("Falha na chamada da API Gemini após várias tentativas:", error);
+                            alert(`Erro ao comunicar com a IA após várias tentativas: ${error.message}`);
+                            return null;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Aumenta a espera
                     }
-                    const result = await response.json();
-                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!text) throw new Error('Invalid API response');
-                    return JSON.parse(text.replace(/```json|```/g, '').trim());
-                } catch (error) {
-                    console.error("Gemini API call failed:", error);
-                    alert(`Erro ao comunicar com a IA: ${error.message}`);
-                    return null;
                 }
             }
 
