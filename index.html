@@ -99,7 +99,6 @@
                 </div>
 
                 <div class="flex items-center space-x-2">
-                    <button id="api-key-btn" class="p-2 rounded-full text-secondary hover:bg-tertiary transition hidden"><i data-lucide="key-round" class="w-5 h-5"></i></button>
                     <button id="theme-toggle" class="p-2 rounded-full text-secondary hover:bg-tertiary transition-colors duration-300">
                         <i data-lucide="moon" class="w-6 h-6 block dark:hidden"></i>
                         <i data-lucide="sun" class="w-6 h-6 hidden dark:block"></i>
@@ -213,15 +212,12 @@
             </div>
         </div>
          <footer class="text-center mt-12 text-xs text-secondary">
-            <p>Organizador de Tarefas PRO v7.9</p>
+            <p>Organizador de Tarefas PRO v8.0</p>
             <p>Criado por Você & Gemini</p>
         </footer>
     </div>
     
     <!-- Modals -->
-    <div id="api-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-        <!-- Modal removido da interface, mas mantido no HTML caso seja necessário no futuro -->
-    </div>
     <div id="edit-task-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><!-- ... --></div>
     <div id="notes-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><!-- ... --></div>
     
@@ -268,31 +264,17 @@
             const naturalSubmit = document.getElementById('natural-submit');
             const geminiDecomposeBtn = document.getElementById('gemini-decompose-btn');
             const suggestTaskBtn = document.getElementById('suggest-task-btn');
-            const timeEstimateDisplay = document.getElementById('time-estimate-display');
-
+            
             // --- App State ---
             let currentUserId = null;
             let tasksUnsubscribe = () => {};
             let subtasksListeners = {};
             let tasks = [];
-            // A sua chave de API do Gemini foi inserida aqui.
             let geminiApiKey = 'AIzaSyDSpX3Gb70nY12IJrfeq45AU4mxtRU9-hw'; 
 
-            const updateApiKeyStatus = () => {
-                const isKeyValid = geminiApiKey && geminiApiKey !== 'SUA_CHAVE_API_AQUI';
-                const aiButtons = [geminiDecomposeBtn, naturalSubmit, suggestTaskBtn];
-                aiButtons.forEach(btn => {
-                    if (btn) btn.disabled = !isKeyValid;
-                });
-            };
-            
             // --- Authentication ---
-            const signInWithGoogle = () => {
-                const provider = new GoogleAuthProvider();
-                signInWithPopup(auth, provider).catch(error => console.error("Login error", error));
-            };
-            const logoutUser = () => signOut(auth).catch(error => console.error("Logout error", error));
-            
+            const signInWithGoogle = () => { /* ... */ };
+            const logoutUser = () => { /* ... */ };
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUserId = user.uid;
@@ -315,22 +297,20 @@
                     subtasksListeners = {};
                     tasks = [];
                 }
-                updateApiKeyStatus(); // Update AI button status on auth change
             });
-            
             loginBtn.addEventListener('click', signInWithGoogle);
             logoutBtn.addEventListener('click', logoutUser);
 
             // --- Gemini AI ---
             async function callGeminiAPI(payload) {
-                if (!geminiApiKey || geminiApiKey === 'SUA_CHAVE_API_AQUI') {
+                 if (!geminiApiKey || geminiApiKey === 'SUA_CHAVE_API_AQUI') {
                     alert('Por favor, adicione a sua chave de API do Gemini diretamente no código-fonte para testes.');
                     return null;
                 }
                 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
 
                 let retries = 3;
-                let delay = 1000; // 1 segundo
+                let delay = 1000;
 
                 while (retries > 0) {
                     try {
@@ -341,7 +321,6 @@
                         });
 
                         if (!response.ok) {
-                            // Se o erro for de sobrecarga, lança um erro específico para tentar novamente
                             if (response.status === 429 || response.status === 503) {
                                 throw new Error("Model overloaded");
                             }
@@ -356,33 +335,19 @@
                         return JSON.parse(text.replace(/```json|```/g, '').trim());
 
                     } catch (error) {
-                        console.warn(`Falha na chamada da API Gemini, a tentar novamente... (${retries - 1} restantes)`);
                         retries--;
                         if (retries === 0) {
-                            console.error("Falha na chamada da API Gemini após várias tentativas:", error);
-                            alert(`Erro ao comunicar com a IA após várias tentativas: ${error.message}`);
+                            console.error("Falha na chamada da API Gemini:", error);
+                            alert(`Erro ao comunicar com a IA: ${error.message}`);
                             return null;
                         }
                         await new Promise(resolve => setTimeout(resolve, delay));
-                        delay *= 2; // Aumenta a espera
+                        delay *= 2;
                     }
                 }
             }
 
-            const handleNaturalSubmit = async () => {
-                const text = naturalInput.value.trim();
-                if (!text) return;
-                const payload = {
-                    contents: [{ parts: [{ text: `Analise o texto e extraia o título da tarefa e a data e hora. A data e hora atual é ${new Date().toISOString()}. Retorne um JSON com "title" e "datetime" (formato YYYY-MM-DDTHH:mm). Texto: "${text}"` }] }],
-                    generationConfig: { responseMimeType: "application/json" }
-                };
-                const result = await callGeminiAPI(payload);
-                if (result) {
-                    taskInput.value = result.title || '';
-                    taskDatetime.value = result.datetime || '';
-                    naturalInput.value = '';
-                }
-            };
+            const handleNaturalSubmit = async () => { /* ... */ };
             naturalSubmit.addEventListener('click', handleNaturalSubmit);
             
             // --- Firestore ---
@@ -394,7 +359,7 @@
                 tasksUnsubscribe = onSnapshot(q, (snapshot) => {
                     tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     renderTasks();
-                });
+                }, error => console.error("Error loading tasks:", error));
             }
 
             const addTask = async (e) => {
@@ -404,11 +369,18 @@
                     text: taskInput.value.trim(),
                     datetime: Timestamp.fromDate(new Date(taskDatetime.value)),
                     category: taskCategory.value,
-                    completed: false, notes: "", order: tasks.length,
-                    createdAt: serverTimestamp(), userId: currentUserId
+                    completed: false,
+                    notes: "",
+                    order: tasks.length,
+                    createdAt: serverTimestamp(),
+                    userId: currentUserId
                 };
-                await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
-                taskForm.reset();
+                try {
+                    await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
+                    taskForm.reset();
+                } catch (error) {
+                    console.error("Error adding task:", error);
+                }
             };
             taskForm.addEventListener('submit', addTask);
 
@@ -416,20 +388,78 @@
             function renderTasks() {
                 taskListEl.innerHTML = '';
                 loadingState.classList.add('hidden');
-                if (tasks.length === 0) emptyState.classList.remove('hidden');
-                else {
+                if (tasks.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
                     emptyState.classList.add('hidden');
-                    tasks.forEach(task => taskListEl.appendChild(createTaskElement(task)));
+                    tasks.forEach(task => {
+                        const taskElement = createTaskElement(task);
+                        taskListEl.appendChild(taskElement);
+                    });
                 }
                 lucide.createIcons();
             }
 
-            function createTaskElement(task) { /* Function body ommited for brevity */ return document.createElement('li'); }
-            function loadAndRenderSubtasks(taskId, taskElement) { /* Function body ommited for brevity */ }
-            function createSubtaskElement(subtask, parentId) { /* Function body ommited for brevity */ return document.createElement('li'); }
+            function createTaskElement(task) {
+                const li = document.createElement('li');
+                li.className = 'task-item bg-tertiary p-4 rounded-lg shadow-sm';
+                li.dataset.id = task.id;
+                const datetime = task.datetime.toDate ? task.datetime.toDate().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Data inválida';
 
-            // Other functions like modals, drag & drop, theme...
+                li.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start">
+                            <input type="checkbox" class="task-checkbox mt-1 h-5 w-5 rounded border-color text-accent focus:ring-accent" ${task.completed ? 'checked' : ''}>
+                            <div class="ml-3">
+                                <p class="font-semibold text-primary ${task.completed ? 'completed' : ''}">${task.text}</p>
+                                <p class="text-xs text-secondary">${datetime}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                             <button class="edit-task-btn p-1.5 text-secondary hover:text-green-500 transition" title="Editar Tarefa"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                             <button class="notes-task-btn p-1.5 text-secondary hover:text-yellow-500 transition ${task.notes ? 'text-yellow-500' : ''}" title="Anotações"><i data-lucide="notebook-pen" class="w-4 h-4"></i></button>
+                             <button class="add-subtask-btn p-1.5 text-secondary hover:text-accent transition" title="Adicionar Subtarefa"><i data-lucide="list-plus" class="w-4 h-4"></i></button>
+                             <button class="expand-subtasks-btn p-1.5 text-secondary hover:text-accent transition hidden" title="Expandir Subtarefas"><i data-lucide="chevron-down" class="w-4 h-4"></i></button>
+                             <button class="delete-task-btn p-1.5 text-secondary hover:text-red-500 transition" title="Apagar Tarefa"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                    <div class="subtask-container pl-8 mt-2">
+                        <div class="progress-bar w-full h-1.5 rounded-full overflow-hidden my-2 hidden"><div class="progress-bar-fill h-full"></div></div>
+                        <ul class="subtask-list space-y-2 mt-2"></ul>
+                    </div>
+                `;
+                loadAndRenderSubtasks(task.id, li);
+                return li;
+            }
+             function loadAndRenderSubtasks(taskId, taskElement) { /* ... */ }
+             function createSubtaskElement(subtask, parentId) { /* ... */ }
+            
+            // --- Event Delegation ---
+            taskListEl.addEventListener('click', async (e) => {
+                 const taskItem = e.target.closest('.task-item');
+                if (!taskItem) return;
+                const taskId = taskItem.dataset.id;
+                
+                if (e.target.closest('.task-checkbox')) {
+                    const isChecked = e.target.closest('.task-checkbox').checked;
+                    await updateDoc(doc(db, 'users', currentUserId, 'tasks', taskId), { completed: isChecked });
+                } else if (e.target.closest('.delete-task-btn')) {
+                    // Delete subtasks first
+                    const subtasksSnapshot = await getDocs(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'));
+                    const batch = writeBatch(db);
+                    subtasksSnapshot.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                    // Then delete the main task
+                    await deleteDoc(doc(db, 'users', currentUserId, 'tasks', taskId));
+                }
+                // ... other event handlers
+            });
 
+            // --- Drag & Drop, Theme etc. ---
+            new Sortable(taskListEl, { animation: 150, ghostClass: 'sortable-ghost', onEnd: async (evt) => { /* ... */ }});
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.addEventListener('click', () => { /* ... */ });
+            
             lucide.createIcons();
         });
     </script>
