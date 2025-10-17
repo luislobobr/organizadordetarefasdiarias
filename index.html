@@ -213,7 +213,7 @@
             </div>
         </div>
          <footer class="text-center mt-12 text-xs text-secondary">
-            <p>Organizador de Tarefas PRO v7.7</p>
+            <p>Organizador de Tarefas PRO v7.8</p>
             <p>Criado por Você & Gemini</p>
         </footer>
     </div>
@@ -327,7 +327,8 @@
                     alert('Por favor, adicione a sua chave de API do Gemini diretamente no código-fonte para testes.');
                     return null;
                 }
-                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
+                // CORRECÇÃO: Utilizar o modelo mais recente e recomendado
+                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
                 try {
                     const response = await fetch(API_URL, {
                         method: 'POST',
