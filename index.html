@@ -407,6 +407,37 @@
             };
             naturalSubmit.addEventListener('click', handleNaturalSubmit);
             
+            geminiDecomposeBtn.addEventListener('click', async () => {
+                const text = taskInput.value.trim();
+                if (!text) {
+                    alert('Por favor, insira uma descrição para a tarefa antes de a decompor.');
+                    return;
+                }
+                geminiDecomposeBtn.disabled = true;
+                const payload = {
+                    contents: [{ parts: [{ text: `Divida esta tarefa em subtarefas mais pequenas e acionáveis: "${text}". Retorne um JSON com uma chave "subtasks" que é um array de strings.` }] }],
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+                const result = await callGeminiAPI(payload);
+                if (result && result.subtasks) {
+                    // Adiciona a tarefa principal primeiro
+                    await addTask(new Event('submit'));
+                    // Encontra a tarefa recém-adicionada (a última) para adicionar subtarefas
+                    setTimeout(async () => {
+                        const lastTask = tasks[tasks.length - 1];
+                        if (lastTask) {
+                            const batch = writeBatch(db);
+                            result.subtasks.forEach(subtaskText => {
+                                const subtaskRef = doc(collection(db, 'users', currentUserId, 'tasks', lastTask.id, 'subtasks'));
+                                batch.set(subtaskRef, { text: subtaskText, completed: false, notes: "", createdAt: serverTimestamp() });
+                            });
+                            await batch.commit();
+                        }
+                    }, 1000); // Espera um pouco para garantir que a tarefa principal foi adicionada
+                }
+                geminiDecomposeBtn.disabled = false;
+            });
+            
             // --- Firestore ---
             function loadTasks(userId) {
                 loadingState.classList.remove('hidden');
@@ -420,7 +451,7 @@
             }
 
             const addTask = async (e) => {
-                e.preventDefault();
+                if(e) e.preventDefault();
                 if (!currentUserId || !taskInput.value.trim() || !taskDatetime.value) return;
                 const newTask = {
                     text: taskInput.value.trim(), datetime: Timestamp.fromDate(new Date(taskDatetime.value)),
