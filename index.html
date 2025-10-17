@@ -213,12 +213,24 @@
             </div>
         </div>
          <footer class="text-center mt-12 text-xs text-secondary">
-            <p>Organizador de Tarefas PRO v7.3</p>
+            <p>Organizador de Tarefas PRO v7.4</p>
             <p>Criado por Você & Gemini</p>
         </footer>
     </div>
     
     <!-- Modals -->
+    <div id="api-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-secondary p-6 rounded-2xl shadow-lg max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-primary">Configurar Chave de API do Gemini</h3>
+                <button id="api-key-modal-close-btn" class="p-1 text-secondary hover:text-red-500 rounded-full"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="api-key-form">
+                <input type="password" id="api-key-input" class="w-full px-4 py-2 border border-color rounded-lg bg-secondary text-primary" placeholder="Cole a sua chave de API aqui">
+                <button type="submit" class="mt-4 w-full accent text-white font-semibold py-2 px-4 rounded-lg">Salvar</button>
+            </form>
+        </div>
+    </div>
     <div id="notes-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
         <div class="bg-secondary p-6 rounded-2xl shadow-lg max-w-lg w-full">
             <h3 class="text-xl font-semibold text-primary mb-4">Anotações</h3>
@@ -234,7 +246,6 @@
             </form>
         </div>
     </div>
-    <!-- Other modals will be structured similarly -->
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -278,22 +289,30 @@
             const notesItemType = document.getElementById('notes-item-type');
             const notesParentId = document.getElementById('notes-parent-id');
             const notesModalCloseBtn = document.getElementById('notes-modal-close-btn');
+            const apiKeyModal = document.getElementById('api-key-modal');
+            const apiKeyForm = document.getElementById('api-key-form');
+            const apiKeyInput = document.getElementById('api-key-input');
+            const apiKeyBtn = document.getElementById('api-key-btn');
+            const apiKeyModalCloseBtn = document.getElementById('api-key-modal-close-btn');
+            const naturalInput = document.getElementById('natural-input');
+            const naturalSubmit = document.getElementById('natural-submit');
+            const geminiDecomposeBtn = document.getElementById('gemini-decompose-btn');
+            const suggestTaskBtn = document.getElementById('suggest-task-btn');
+            const timeEstimateDisplay = document.getElementById('time-estimate-display');
 
             // --- App State ---
             let currentUserId = null;
             let tasksUnsubscribe = () => {};
             let subtasksListeners = {};
             let tasks = [];
+            let geminiApiKey = sessionStorage.getItem('geminiApiKey');
 
             // --- Authentication ---
             const signInWithGoogle = () => {
                 const provider = new GoogleAuthProvider();
                 signInWithPopup(auth, provider).catch(error => console.error("Login error", error));
             };
-
-            const logoutUser = () => {
-                signOut(auth).catch(error => console.error("Logout error", error));
-            };
+            const logoutUser = () => signOut(auth).catch(error => console.error("Logout error", error));
             
             const updateUIForAuthState = (user) => {
                 if (user) {
@@ -320,9 +339,49 @@
             };
             
             onAuthStateChanged(auth, updateUIForAuthState);
-            
             loginBtn.addEventListener('click', signInWithGoogle);
             logoutBtn.addEventListener('click', logoutUser);
+
+            // --- Gemini AI ---
+            async function callGeminiAPI(payload) {
+                if (!geminiApiKey) {
+                    alert('Por favor, configure a sua chave de API do Gemini primeiro.');
+                    return null;
+                }
+                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!text) throw new Error('Invalid API response');
+                    return JSON.parse(text.replace(/```json|```/g, '').trim());
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    alert(`Erro ao comunicar com a IA: ${error.message}`);
+                    return null;
+                }
+            }
+
+            const handleNaturalSubmit = async () => {
+                const text = naturalInput.value.trim();
+                if (!text) return;
+                const payload = {
+                    contents: [{ parts: [{ text: `Analise o texto e extraia o título da tarefa e a data e hora. A data e hora atual é ${new Date().toISOString()}. Retorne um JSON com "title" e "datetime" (formato YYYY-MM-DDTHH:mm). Texto: "${text}"` }] }],
+                     generationConfig: { responseMimeType: "application/json" }
+                };
+                const result = await callGeminiAPI(payload);
+                if (result) {
+                    taskInput.value = result.title || '';
+                    taskDatetime.value = result.datetime || '';
+                    naturalInput.value = '';
+                }
+            };
+            naturalSubmit.addEventListener('click', handleNaturalSubmit);
 
             // --- Firestore ---
             function loadTasks(userId) {
@@ -346,11 +405,8 @@
                     text: taskInput.value.trim(),
                     datetime: Timestamp.fromDate(new Date(taskDatetime.value)),
                     category: taskCategory.value,
-                    completed: false,
-                    notes: "",
-                    order: tasks.length,
-                    createdAt: serverTimestamp(),
-                    userId: currentUserId
+                    completed: false, notes: "", order: tasks.length,
+                    createdAt: serverTimestamp(), userId: currentUserId
                 };
                 try {
                     await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
@@ -377,7 +433,6 @@
                 li.className = 'task-item bg-tertiary p-4 rounded-lg shadow-sm';
                 li.dataset.id = task.id;
                 const datetime = task.datetime.toDate ? task.datetime.toDate().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Data inválida';
-
                 li.innerHTML = `
                     <div class="flex items-start justify-between">
                         <div class="flex items-start">
@@ -412,11 +467,10 @@
                 const subtasksRef = collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks');
                 const q = query(subtasksRef, orderBy('createdAt', 'asc'));
 
-                if (subtasksListeners[taskId]) subtasksListeners[taskId](); // Unsubscribe from previous listener
+                if (subtasksListeners[taskId]) subtasksListeners[taskId]();
                 subtasksListeners[taskId] = onSnapshot(q, snapshot => {
                     subtaskList.innerHTML = '';
                     const subtasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
                     if (subtasks.length > 0) {
                         expandBtn.classList.remove('hidden');
                         progressBarContainer.classList.remove('hidden');
@@ -427,18 +481,16 @@
                         expandBtn.classList.add('hidden');
                         progressBarContainer.classList.add('hidden');
                     }
-                    
                     subtasks.forEach(subtask => subtaskList.appendChild(createSubtaskElement(subtask, taskId)));
                     lucide.createIcons();
                 });
             }
 
-             function createSubtaskElement(subtask, parentId) {
+            function createSubtaskElement(subtask, parentId) {
                 const li = document.createElement('li');
                 li.className = 'subtask-item flex items-center justify-between bg-secondary p-2 rounded-md';
                 li.dataset.id = subtask.id;
                 li.dataset.parentId = parentId;
-
                 li.innerHTML = `
                     <div class="flex items-center">
                         <input type="checkbox" class="subtask-checkbox h-4 w-4 rounded border-color text-accent focus:ring-accent" ${subtask.completed ? 'checked' : ''}>
@@ -452,23 +504,21 @@
                 return li;
             }
             
-            // --- Event Delegation for Tasks and Subtasks ---
+            // --- Event Delegation ---
             taskListEl.addEventListener('click', async (e) => {
                 const taskItem = e.target.closest('.task-item');
                 if (!taskItem) return;
                 const taskId = taskItem.dataset.id;
                 const task = tasks.find(t => t.id === taskId);
 
-                // Main task actions
                 if (e.target.closest('.task-checkbox')) {
                     const isChecked = e.target.closest('.task-checkbox').checked;
                     await updateDoc(doc(db, 'users', currentUserId, 'tasks', taskId), { completed: isChecked });
                 } else if (e.target.closest('.delete-task-btn')) {
-                    // Also delete subtasks
-                     const subtasksSnapshot = await getDocs(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'));
-                     const batch = writeBatch(db);
-                     subtasksSnapshot.forEach(doc => batch.delete(doc.ref));
-                     await batch.commit();
+                    const subtasksSnapshot = await getDocs(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'));
+                    const batch = writeBatch(db);
+                    subtasksSnapshot.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
                     await deleteDoc(doc(db, 'users', currentUserId, 'tasks', taskId));
                 } else if (e.target.closest('.notes-task-btn')) {
                     openNotesModal(taskId, 'task', task.notes || "");
@@ -478,72 +528,56 @@
                     const newSubtaskText = prompt("Nova subtarefa:");
                     if (newSubtaskText) {
                          await addDoc(collection(db, 'users', currentUserId, 'tasks', taskId, 'subtasks'), {
-                            text: newSubtaskText,
-                            completed: false,
-                            notes: "",
-                            createdAt: serverTimestamp()
+                            text: newSubtaskText, completed: false, notes: "", createdAt: serverTimestamp()
                         });
                     }
                 }
 
-                // Subtask actions
                 const subtaskItem = e.target.closest('.subtask-item');
                 if (subtaskItem) {
                     const subtaskId = subtaskItem.dataset.id;
                     const parentId = subtaskItem.dataset.parentId;
                     const subtaskRef = doc(db, 'users', currentUserId, 'tasks', parentId, 'subtasks', subtaskId);
-                    
                     if (e.target.closest('.subtask-checkbox')) {
-                        const isChecked = e.target.closest('.subtask-checkbox').checked;
-                        await updateDoc(subtaskRef, { completed: isChecked });
+                        await updateDoc(subtaskRef, { completed: e.target.closest('.subtask-checkbox').checked });
                     } else if (e.target.closest('.delete-subtask-btn')) {
                         await deleteDoc(subtaskRef);
                     } else if (e.target.closest('.notes-subtask-btn')) {
                         const subtaskDoc = await getDoc(subtaskRef);
-                        const subtaskData = subtaskDoc.data();
-                        openNotesModal(subtaskId, 'subtask', subtaskData.notes || "", parentId);
+                        openNotesModal(subtaskId, 'subtask', subtaskDoc.data().notes || "", parentId);
                     }
                 }
             });
 
-            // --- Notes Modal ---
+            // --- Modals Logic ---
             function openNotesModal(id, type, currentNotes, parentId = null) {
-                notesItemId.value = id;
-                notesItemType.value = type;
-                notesParentId.value = parentId;
-                notesTextarea.value = currentNotes;
+                notesItemId.value = id; notesItemType.value = type;
+                notesParentId.value = parentId; notesTextarea.value = currentNotes;
                 notesModal.classList.remove('hidden');
             }
-            function closeNotesModal() {
-                notesModal.classList.add('hidden');
-            }
+            function closeNotesModal() { notesModal.classList.add('hidden'); }
             notesModalCloseBtn.addEventListener('click', closeNotesModal);
             notesForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const id = notesItemId.value;
-                const type = notesItemType.value;
-                const parentId = notesParentId.value;
-                const notes = notesTextarea.value;
-                
-                let docRef;
-                if (type === 'task') {
-                    docRef = doc(db, 'users', currentUserId, 'tasks', id);
-                } else {
-                    docRef = doc(db, 'users', currentUserId, 'tasks', parentId, 'subtasks', id);
-                }
-                
-                try {
-                    await updateDoc(docRef, { notes: notes });
-                    closeNotesModal();
-                } catch (error) {
-                    console.error("Error saving notes:", error);
-                }
+                const id = notesItemId.value, type = notesItemType.value, parentId = notesParentId.value, notes = notesTextarea.value;
+                const docRef = type === 'task' ? doc(db, 'users', currentUserId, 'tasks', id) : doc(db, 'users', currentUserId, 'tasks', parentId, 'subtasks', id);
+                await updateDoc(docRef, { notes });
+                closeNotesModal();
             });
 
-            // --- Drag and Drop ---
+            apiKeyBtn.addEventListener('click', () => apiKeyModal.classList.remove('hidden'));
+            apiKeyModalCloseBtn.addEventListener('click', () => apiKeyModal.classList.add('hidden'));
+            apiKeyForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                geminiApiKey = apiKeyInput.value;
+                sessionStorage.setItem('geminiApiKey', geminiApiKey);
+                apiKeyModal.classList.add('hidden');
+                alert('Chave de API salva!');
+            });
+            
+            // --- Drag & Drop ---
             new Sortable(taskListEl, {
-                animation: 150,
-                ghostClass: 'sortable-ghost',
+                animation: 150, ghostClass: 'sortable-ghost',
                 onEnd: async (evt) => {
                     const movedItem = tasks.splice(evt.oldIndex, 1)[0];
                     tasks.splice(evt.newIndex, 0, movedItem);
@@ -560,9 +594,7 @@
             const themeToggle = document.getElementById('theme-toggle');
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+            } else { document.documentElement.classList.remove('dark'); }
             themeToggle.addEventListener('click', () => {
                 document.documentElement.classList.toggle('dark');
                 localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
