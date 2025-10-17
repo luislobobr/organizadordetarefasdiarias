@@ -45,6 +45,7 @@
         body { background-color: rgb(var(--bg-primary)); color: rgb(var(--text-primary)); }
         .bg-secondary { background-color: rgb(var(--bg-secondary)); }
         .bg-tertiary { background-color: rgb(var(--bg-tertiary)); }
+        .text-primary { color: rgb(var(--text-primary)); }
         .text-secondary { color: rgb(var(--text-secondary)); }
         .border-color { border-color: rgb(var(--border-color)); }
         .accent { background-color: rgb(var(--accent-color)); }
@@ -84,7 +85,7 @@
                     <div id="user-info" class="auth-ui-element items-center space-x-3">
                         <img id="user-avatar" class="w-10 h-10 rounded-full" src="" alt="User Avatar">
                         <div>
-                            <p id="user-name" class="font-semibold"></p>
+                            <p id="user-name" class="font-semibold text-primary"></p>
                             <button id="logout-btn" class="text-sm text-accent hover:underline">Sair</button>
                         </div>
                     </div>
@@ -106,7 +107,7 @@
 
             <div id="main-content" class="relative">
                 <div id="logged-out-state" class="absolute inset-0 flex-col items-center justify-center text-center py-12 z-10 hidden bg-primary/50 backdrop-blur-sm rounded-2xl">
-                    <h3 class="mt-4 text-2xl font-bold">Sua Central de Produtividade</h3>
+                    <h3 class="mt-4 text-2xl font-bold text-primary">Sua Central de Produtividade</h3>
                     <p class="mt-2 max-w-md mx-auto text-secondary">Faça login para acessar suas tarefas, criar subtarefas, receber lembretes e muito mais.</p>
                 </div>
 
@@ -114,12 +115,12 @@
                     <!-- Coluna da Esquerda: Adicionar Tarefa -->
                     <aside class="lg:col-span-1">
                         <div class="bg-secondary p-6 rounded-2xl shadow-lg sticky top-8">
-                           <h2 class="text-2xl font-semibold flex items-center mb-4"><i data-lucide="plus-circle" class="mr-2"></i> Nova Tarefa</h2>
+                           <h2 class="text-2xl font-semibold flex items-center mb-4 text-primary"><i data-lucide="plus-circle" class="mr-2"></i> Nova Tarefa</h2>
                             
                             <div class="space-y-4">
                                 <!-- Natural Language Input -->
                                 <div class="relative">
-                                    <input type="text" id="natural-input" placeholder='Tente: "Reunião de projeto amanhã 10h"' class="w-full px-4 py-2 pr-10 border border-color rounded-lg focus:ring-2 ring-accent focus:border-color bg-secondary">
+                                    <input type="text" id="natural-input" placeholder='Tente: "Reunião de projeto amanhã 10h"' class="w-full px-4 py-2 pr-10 border border-color rounded-lg focus:ring-2 ring-accent focus:border-color bg-secondary text-primary">
                                     <button id="natural-submit" class="absolute inset-y-0 right-0 flex items-center pr-3 text-accent"><i data-lucide="sparkles" class="w-5 h-5"></i></button>
                                 </div>
                                 <div class="text-center text-xs text-secondary my-2">ou preencha manualmente</div>
@@ -129,16 +130,16 @@
                                     <input type="hidden" id="task-time-estimate">
                                     <div>
                                         <label for="task-input" class="block text-sm font-medium text-secondary mb-1">Descrição</label>
-                                        <input type="text" id="task-input" placeholder="O que precisa ser feito?" required class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary">
+                                        <input type="text" id="task-input" placeholder="O que precisa ser feito?" required class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary text-primary">
                                     </div>
                                     <div class="grid grid-cols-2 gap-4">
                                         <div>
                                             <label for="task-datetime" class="block text-sm font-medium text-secondary mb-1">Data e Hora</label>
-                                            <input type="datetime-local" id="task-datetime" required class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary [color-scheme:dark]">
+                                            <input type="datetime-local" id="task-datetime" required class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary text-primary [color-scheme:light] dark:[color-scheme:dark]">
                                         </div>
                                         <div>
                                             <label for="task-category" class="block text-sm font-medium text-secondary mb-1">Categoria</label>
-                                            <select id="task-category" class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary">
+                                            <select id="task-category" class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary text-primary">
                                                 <option value="projeto">Projeto</option>
                                                 <option value="trabalho">Trabalho</option>
                                                 <option value="reuniao">Reunião</option>
@@ -148,7 +149,7 @@
                                     </div>
                                     <div>
                                         <label for="task-recurrence" class="block text-sm font-medium text-secondary mb-1">Repetir</label>
-                                        <select id="task-recurrence" class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary">
+                                        <select id="task-recurrence" class="w-full px-4 py-2 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary text-primary">
                                             <option value="none">Nunca</option>
                                             <option value="daily">Diariamente</option>
                                             <option value="weekly">Semanalmente</option>
@@ -157,7 +158,7 @@
                                     </div>
                                     <div class="flex items-center">
                                         <input type="checkbox" id="task-reminder" class="h-4 w-4 rounded border-color text-accent focus:ring-accent">
-                                        <label for="task-reminder" class="ml-2 block text-sm">Ativar lembrete?</label>
+                                        <label for="task-reminder" class="ml-2 block text-sm text-primary">Ativar lembrete?</label>
                                     </div>
                                     <div class="text-xs text-center text-secondary h-4" id="time-estimate-display"></div>
                                     <div class="grid grid-cols-2 gap-3">
@@ -176,13 +177,13 @@
                                 <div class="flex items-center gap-4 w-full">
                                     <div class="relative flex-grow">
                                         <i data-lucide="search" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-secondary"></i>
-                                        <input type="text" id="search-bar" placeholder="Pesquisar tarefas..." class="w-full px-4 py-2 pl-10 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary">
+                                        <input type="text" id="search-bar" placeholder="Pesquisar tarefas..." class="w-full px-4 py-2 pl-10 border border-color rounded-lg focus:ring-2 ring-accent bg-secondary text-primary">
                                     </div>
                                     <button id="suggest-task-btn" class="p-2 accent text-white rounded-lg flex-shrink-0 hover:opacity-90 transition" title="Sugerir Próxima Tarefa"><i data-lucide="lightbulb" class="w-5 h-5"></i></button>
                                 </div>
                                 <div class="flex items-center space-x-2 w-full sm:w-auto">
-                                    <span class="text-sm font-medium">Ver:</span>
-                                    <select id="filter-category" class="px-3 py-1.5 border border-color rounded-lg focus:ring-2 ring-accent text-sm bg-secondary">
+                                    <span class="text-sm font-medium text-primary">Ver:</span>
+                                    <select id="filter-category" class="px-3 py-1.5 border border-color rounded-lg focus:ring-2 ring-accent text-sm bg-secondary text-primary">
                                         <option value="all">Todas</option>
                                         <option value="dashboard">Visão do Dia</option>
                                         <option value="projeto">Projeto</option>
@@ -197,7 +198,7 @@
                             
                             <ul id="task-list" class="space-y-4 min-h-[300px]">
                                  <div id="empty-state" class="text-center py-12 hidden">
-                                    <h3 class="mt-4 text-xl font-semibold">Nenhuma tarefa por aqui!</h3>
+                                    <h3 class="mt-4 text-xl font-semibold text-primary">Nenhuma tarefa por aqui!</h3>
                                     <p class="mt-1 text-secondary">Adicione uma nova tarefa para começar a se organizar.</p>
                                 </div>
                                 <div id="loading-state" class="text-center py-12 hidden">
@@ -212,11 +213,16 @@
     </div>
     
     <!-- Modals -->
-    <div id="api-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><!-- Content --></div>
-    <div id="notification-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><!-- Content --></div>
-    <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><!-- Content --></div>
-    <div id="edit-subtask-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><!-- Content --></div>
-    <div id="notes-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><!-- Content --></div>
+    <div id="api-key-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-secondary p-6 rounded-2xl shadow-lg max-w-md w-full">
+            <h3 class="text-xl font-semibold text-primary mb-4">Configurar Chave de API do Gemini</h3>
+            <form id="api-key-form">
+                <input type="password" id="api-key-input" class="w-full px-4 py-2 border border-color rounded-lg bg-secondary text-primary">
+                <button type="submit" class="mt-4 w-full accent text-white font-semibold py-2 px-4 rounded-lg">Salvar</button>
+            </form>
+        </div>
+    </div>
+    <!-- Other modals will be structured similarly -->
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -238,52 +244,201 @@
         const auth = getAuth(app);
 
         document.addEventListener('DOMContentLoaded', () => {
-            // This is a placeholder for the full JS logic.
-            // In a real scenario, this script would contain tens of functions and event listeners
-            // to power all the features described.
-            console.log("App PRO Initialized - Full logic would be here.");
-            
-            // Re-adding the login functionality as it was the main reported issue.
+            // --- DOM Elements ---
             const loginBtn = document.getElementById('login-btn');
             const logoutBtn = document.getElementById('logout-btn');
             const userInfo = document.getElementById('user-info');
-            const mainContent = document.getElementById('main-content');
-            const loggedOutState = document.getElementById('logged-out-state');
             const userName = document.getElementById('user-name');
             const userAvatar = document.getElementById('user-avatar');
+            const mainContent = document.getElementById('main-content');
+            const loggedOutState = document.getElementById('logged-out-state');
+            const taskListEl = document.getElementById('task-list');
+            const taskForm = document.getElementById('task-form');
+            const taskInput = document.getElementById('task-input');
+            const taskDatetime = document.getElementById('task-datetime');
+            const taskCategory = document.getElementById('task-category');
+            const loadingState = document.getElementById('loading-state');
+            const emptyState = document.getElementById('empty-state');
 
-            const signInWithGoogle = async () => {
+            // --- App State ---
+            let currentUserId = null;
+            let tasksUnsubscribe = () => {};
+            let tasks = [];
+
+            // --- Authentication ---
+            const signInWithGoogle = () => {
                 const provider = new GoogleAuthProvider();
-                try {
-                    await signInWithPopup(auth, provider);
-                } catch (error) {
-                    console.error("Erro no login com Google:", error);
-                }
+                signInWithPopup(auth, provider).catch(error => console.error("Login error", error));
             };
-            const logoutUser = () => signOut(auth).catch(error => console.error("Erro ao sair:", error));
-            
-            onAuthStateChanged(auth, (user) => {
+
+            const logoutUser = () => {
+                signOut(auth).catch(error => console.error("Logout error", error));
+            };
+
+            const updateUIForAuthState = (user) => {
                 if (user) {
+                    currentUserId = user.uid;
                     mainContent.classList.remove('logged-out');
                     loggedOutState.classList.add('hidden');
-                    loginBtn.style.display = 'none'; // quick fix for visibility
-                    userInfo.style.display = 'flex';
+                    loginBtn.classList.remove('visible');
+                    userInfo.classList.add('visible');
                     userName.textContent = user.displayName;
                     userAvatar.src = user.photoURL;
-                    // ... and all other logic to load tasks would run here
+                    loadTasks(user.uid);
                 } else {
+                    currentUserId = null;
                     mainContent.classList.add('logged-out');
                     loggedOutState.classList.remove('hidden');
-                    loginBtn.style.display = 'flex';
-                    userInfo.style.display = 'none';
+                    loginBtn.classList.add('visible');
+                    userInfo.classList.remove('visible');
+                    taskListEl.innerHTML = '';
+                    tasksUnsubscribe(); // Unsubscribe from old listener
+                    tasks = [];
                 }
-            });
-
+            };
+            
+            onAuthStateChanged(auth, updateUIForAuthState);
+            
             loginBtn.addEventListener('click', signInWithGoogle);
             logoutBtn.addEventListener('click', logoutUser);
 
-            // Placeholder for other features...
+            // --- Firestore ---
+            function loadTasks(userId) {
+                loadingState.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+                
+                const tasksRef = collection(db, 'users', userId, 'tasks');
+                const q = query(tasksRef, orderBy('order', 'asc'));
+
+                tasksUnsubscribe(); // Unsubscribe from any previous listener
+                tasksUnsubscribe = onSnapshot(q, (snapshot) => {
+                    tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderTasks();
+                    loadingState.classList.add('hidden');
+                    if (tasks.length === 0) {
+                        emptyState.classList.remove('hidden');
+                    }
+                }, error => {
+                    console.error("Error loading tasks:", error);
+                    loadingState.classList.add('hidden');
+                    // show error modal
+                });
+            }
+
+            const addTask = async (e) => {
+                e.preventDefault();
+                if (!currentUserId || !taskInput.value.trim() || !taskDatetime.value) return;
+
+                const newTask = {
+                    text: taskInput.value.trim(),
+                    datetime: Timestamp.fromDate(new Date(taskDatetime.value)),
+                    category: taskCategory.value,
+                    completed: false,
+                    // recurrence: taskRecurrence.value,
+                    // reminder: taskReminder.checked,
+                    // notes: "",
+                    // timeEstimate: taskTimeEstimate.value,
+                    order: tasks.length, // Add to the end
+                    createdAt: serverTimestamp(),
+                    userId: currentUserId
+                };
+                
+                try {
+                    await addDoc(collection(db, 'users', currentUserId, 'tasks'), newTask);
+                    taskForm.reset();
+                } catch (error) {
+                    console.error("Error adding task:", error);
+                }
+            };
+
+            taskForm.addEventListener('submit', addTask);
+
+            // --- Rendering ---
+            function renderTasks() {
+                taskListEl.innerHTML = ''; // Clear list
+                if (tasks.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+                emptyState.classList.add('hidden');
+                
+                tasks.forEach(task => {
+                    const taskElement = createTaskElement(task);
+                    taskListEl.appendChild(taskElement);
+                });
+                lucide.createIcons();
+            }
+
+            function createTaskElement(task) {
+                const li = document.createElement('li');
+                li.className = 'task-item bg-tertiary p-4 rounded-lg shadow-sm';
+                li.dataset.id = task.id;
+
+                const datetime = task.datetime.toDate ? task.datetime.toDate().toLocaleString('pt-BR') : 'Data inválida';
+
+                li.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input type="checkbox" class="task-checkbox h-5 w-5 rounded border-color text-accent focus:ring-accent" ${task.completed ? 'checked' : ''}>
+                            <div class="ml-3">
+                                <p class="font-semibold text-primary ${task.completed ? 'completed' : ''}">${task.text}</p>
+                                <p class="text-xs text-secondary">${datetime}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="delete-task-btn p-1.5 text-secondary hover:text-red-500 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `;
+
+                // Add event listeners for checkbox and delete button
+                const checkbox = li.querySelector('.task-checkbox');
+                checkbox.addEventListener('change', async () => {
+                    const taskRef = doc(db, 'users', currentUserId, 'tasks', task.id);
+                    await updateDoc(taskRef, { completed: checkbox.checked });
+                });
+
+                const deleteBtn = li.querySelector('.delete-task-btn');
+                deleteBtn.addEventListener('click', async () => {
+                     const taskRef = doc(db, 'users', currentUserId, 'tasks', task.id);
+                     await deleteDoc(taskRef);
+                });
+
+
+                return li;
+            }
+
+            // --- Drag and Drop ---
+            new Sortable(taskListEl, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: async (evt) => {
+                    const movedItem = tasks.splice(evt.oldIndex, 1)[0];
+                    tasks.splice(evt.newIndex, 0, movedItem);
+
+                    const batch = writeBatch(db);
+                    tasks.forEach((task, index) => {
+                        const taskRef = doc(db, 'users', currentUserId, 'tasks', task.id);
+                        batch.update(taskRef, { order: index });
+                    });
+                    await batch.commit();
+                }
+            });
+
+
+            // --- Theme ---
+            const themeToggle = document.getElementById('theme-toggle');
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            themeToggle.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            });
             
+            // Initial call to create icons
             lucide.createIcons();
         });
     </script>
